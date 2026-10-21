@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: followUpFin
+  config:
+    # API 키는 git에 올리지 않는 secret.yml에 둔다 (예시: secret.example.yml)
+    import: optional:file:./secret.yml
+  datasource:
+    url: jdbc:h2:file:./data/briefing
+  jpa:
+    hibernate:
+      ddl-auto: update
+  h2:
+    console:
+      enabled: true
+  web:
+    error:
+      include-message: always # 화면에 "없는 티커" 같은 이유를 보여주려고
+
+briefing:
+  poll-interval: PT10M

@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>종목 브리핑</title>
+<style>
+  :root { --bg: #f6f7f9; --card: #fff; --text: #1a1d21; --muted: #6b7280; --line: #e5e7eb; --accent: #2563eb; --news: #0f766e; --disc: #b45309; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 16px 20px; border-bottom: 1px solid var(--line); background: var(--card); display: flex; justify-content: space-between; align-items: center; }
+  h1 { font-size: 18px; margin: 0; }
+  #updated { color: var(--muted); font-size: 13px; }
+  main { display: grid; grid-template-columns: 260px 1fr; gap: 16px; padding: 16px 20px; max-width: 1100px; margin: 0 auto; }
+  @media (max-width: 720px) { main { grid-template-columns: 1fr; padding: 12px 16px; } }
+  aside, section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  h2 { font-size: 14px; margin: 4px 4px 10px; color: var(--muted); }
+  .stock { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+  .stock:hover { background: var(--bg); }
+  .stock.active { background: #e8efff; color: var(--accent); font-weight: 600; }
+  .stock small { color: var(--muted); font-weight: normal; margin-left: 6px; }
+  .group { display: flex; justify-content: space-between; margin-top: 10px; padding: 6px 10px; font-size: 12px; font-weight: 600; color: var(--muted); border-radius: 8px; cursor: pointer; }
+  .group:hover { background: var(--bg); }
+  .group.active { background: #e8efff; color: var(--accent); }
+  .stock.indent { padding-left: 18px; }
+  .stock button { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 16px; }
+  form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; margin-top: 12px; border-top: 1px solid var(--line); padding-top: 12px; }
+  input { padding: 7px 8px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; min-width: 0; }
+  form button { padding: 7px 10px; border: 0; border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; }
+  #error { color: #dc2626; font-size: 12px; margin: 6px 4px 0; }
+  .item { padding: 12px 6px; border-bottom: 1px solid var(--line); }
+  .item:last-child { border-bottom: 0; }
+  .meta { font-size: 12px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+  .badge { font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px; color: #fff; }
+  .badge.NEWS { background: var(--news); }
+  .badge.DISCLOSURE { background: var(--disc); }
+  .item a { display: block; color: var(--text); text-decoration: none; font-weight: 600; margin: 4px 0; }
+  .item a:hover { color: var(--accent); }
+  .item p { margin: 0; font-size: 13px; color: var(--muted); }
+  .empty { color: var(--muted); padding: 24px; text-align: center; }
+</style>
+</head>
+<body>
+<header><h1>종목 브리핑</h1><span id="updated"></span></header>
+<main>
+  <aside>
+    <h2>팔로우 종목</h2>
+    <div id="stocks"></div>
+    <form id="follow">
+      <input name="stockCode" placeholder="티커 (NVDA)" maxlength="7" required>
+      <input name="name" placeholder="이름 (선택)">
+      <button>추가</button>
+    </form>
+    <div id="error"></div>
+  </aside>
+  <section>
+    <h2 id="feedTitle">전체 피드</h2>
+    <div id="feed"></div>
+  </section>
+</main>
+<script>
+  // selected: null(전체) | { stockCode, label } | { industry, label }
+  let selected = null;
+  const LABEL = { NEWS: '뉴스', DISCLOSURE: '공시' };
+  const NO_INDUSTRY = '분류 없음';
+
+  // 외부 데이터(기사 제목 등)는 innerHTML 대신 textContent로만 넣는다
+  function el(tag, props = {}, ...children) {
+    const e = Object.assign(document.createElement(tag), props);
+    e.append(...children);
+    return e;
+  }
+
+  function stockRow(s) {
+    const del = el('button', { textContent: '×', title: '팔로우 해제', onclick: async ev => {
+      ev.stopPropagation();
+      await fetch('/api/stocks/' + encodeURIComponent(s.stockCode), { method: 'DELETE' });
+      if (selected?.stockCode === s.stockCode) selected = null;
+      refresh();
+    }});
+    const active = selected?.stockCode === s.stockCode ? ' active' : '';
+    return el('div', { className: 'stock indent' + active, onclick: () => select({ stockCode: s.stockCode, label: s.name }) },
+      el('span', {}, s.name, el('small', { textContent: s.stockCode })), del);
+  }
+
+  // 업종별로 묶어서 보여준다. 업종 제목을 누르면 그 업종 전체 피드
+  async function loadStocks() {
+    const stocks = await (await fetch('/api/stocks')).json();
+    const groups = Map.groupBy(stocks, s => s.industry ?? NO_INDUSTRY);
+    const box = document.getElementById('stocks');
+    box.replaceChildren(el('div', { className: 'stock' + (selected ? '' : ' active'), textContent: '전체', onclick: () => select(null) }));
+    for (const [industry, list] of [...groups].sort(([a], [b]) => a.localeCompare(b))) {
+      const clickable = industry !== NO_INDUSTRY;
+      box.append(el('div', {
+        className: 'group' + (selected?.industry === industry ? ' active' : ''),
+        onclick: () => clickable && select({ industry, label: industry }),
+      }, el('span', { textContent: industry }), el('span', { textContent: list.length })));
+      list.forEach(s => box.append(stockRow(s)));
+    }
+  }
+
+  async function loadFeed() {
+    const q = selected?.stockCode ? '?stockCode=' + encodeURIComponent(selected.stockCode)
+      : selected?.industry ? '?industry=' + encodeURIComponent(selected.industry) : '';
+    const items = await (await fetch('/api/feed' + q)).json();
+    document.getElementById('feedTitle').textContent = selected ? selected.label + ' 피드' : '전체 피드';
+    const feed = document.getElementById('feed');
+    if (!items.length) {
+      feed.replaceChildren(el('div', { className: 'empty', textContent: '아직 모인 정보가 없습니다. 종목을 추가하거나 다음 수집(10분)을 기다려 주세요.' }));
+      return;
+    }
+    feed.replaceChildren(...items.map(i => el('div', { className: 'item' },
+      el('div', { className: 'meta' },
+        el('span', { className: 'badge ' + i.type, textContent: LABEL[i.type] }),
+        el('span', { textContent: i.stockName }),
+        el('span', { textContent: i.source ?? '' }),
+        el('span', { textContent: new Date(i.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) })),
+      el('a', { href: i.url, target: '_blank', rel: 'noopener noreferrer', textContent: i.title }),
+      el('p', { textContent: i.summary }))));
+  }
+
+  function select(target) { selected = target; refresh(); }
+
+  async function refresh() {
+    await Promise.all([loadStocks(), loadFeed()]);
+    document.getElementById('updated').textContent = new Date().toLocaleTimeString('ko-KR') + ' 갱신';
+  }
+
+  document.getElementById('follow').onsubmit = async ev => {
+    ev.preventDefault();
+    const form = ev.target;
+    const button = form.querySelector('button');
+    button.disabled = true; // 추가하면서 첫 뉴스까지 받아와 1~2초 걸린다
+    const res = await fetch('/api/stocks', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stockCode: form.stockCode.value.trim(), name: form.name.value.trim() })
+    });
+    button.disabled = false;
+    document.getElementById('error').textContent = res.ok ? '' : ((await res.json()).message || '티커를 확인하세요');
+    if (res.ok) { form.reset(); refresh(); }
+  };
+
+  refresh();
+  setInterval(refresh, 60_000);
+</script>
+</body>
+</html>
