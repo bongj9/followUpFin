@@ -15,6 +15,10 @@ spring:
   web:
     error:
       include-message: always # 화면에 "없는 티커" 같은 이유를 보여주려고
+    resources:
+      cache:
+        cachecontrol:
+          no-cache: true # 화면을 고치면 새로고침만으로 바로 반영되게 (브라우저가 옛 index.html을 재사용하지 않도록)
 
 briefing:
   poll-interval: PT10M
