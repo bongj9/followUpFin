@@ -1,6 +1,8 @@
 package com.bongj9.briefing;
 
 import com.bongj9.briefing.disclosure.DisclosureCollector;
+import com.bongj9.briefing.move.PriceMove;
+import com.bongj9.briefing.move.PriceMoveDetector;
 import com.bongj9.briefing.news.NewsCollector;
 import com.bongj9.briefing.stock.FollowedStock;
 import com.bongj9.briefing.stock.FollowedStockRepository;
@@ -22,12 +24,14 @@ class CollectScheduler {
     private final DisclosureCollector disclosureCollector;
     private final NewsCollector newsCollector;
     private final FollowedStockRepository stockRepository;
+    private final PriceMoveDetector priceMoveDetector;
 
     CollectScheduler(DisclosureCollector disclosureCollector, NewsCollector newsCollector,
-                     FollowedStockRepository stockRepository) {
+                     FollowedStockRepository stockRepository, PriceMoveDetector priceMoveDetector) {
         this.disclosureCollector = disclosureCollector;
         this.newsCollector = newsCollector;
         this.stockRepository = stockRepository;
+        this.priceMoveDetector = priceMoveDetector;
     }
 
     // 수집원 하나가 실패해도 나머지는 계속 돈다
@@ -48,6 +52,15 @@ class CollectScheduler {
             } catch (RuntimeException e) {
                 log.error("뉴스 수집 실패 [{}]: {}", stock.getName(), e.getMessage());
             }
+        }
+
+        // 뉴스를 먼저 모은 뒤 감지해야 급등락 시점의 기사가 피드에 같이 있다
+        try {
+            for (PriceMove move : priceMoveDetector.detect()) {
+                log.info("큰 변동 감지 [{}]: {}%", move.getStockCode(), move.getChangeRate());
+            }
+        } catch (RuntimeException e) {
+            log.error("시세 변동 감지 실패: {}", e.getMessage());
         }
     }
 }

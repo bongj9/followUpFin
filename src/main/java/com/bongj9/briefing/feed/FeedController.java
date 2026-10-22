@@ -1,6 +1,7 @@
 package com.bongj9.briefing.feed;
 
 import com.bongj9.briefing.disclosure.DisclosureRepository;
+import com.bongj9.briefing.move.PriceMoveRepository;
 import com.bongj9.briefing.news.NewsRepository;
 import com.bongj9.briefing.stock.FollowedStock;
 import com.bongj9.briefing.stock.FollowedStockRepository;
@@ -29,12 +30,14 @@ class FeedController {
     private final FollowedStockRepository stockRepository;
     private final NewsRepository newsRepository;
     private final DisclosureRepository disclosureRepository;
+    private final PriceMoveRepository priceMoveRepository;
 
     FeedController(FollowedStockRepository stockRepository, NewsRepository newsRepository,
-                   DisclosureRepository disclosureRepository) {
+                   DisclosureRepository disclosureRepository, PriceMoveRepository priceMoveRepository) {
         this.stockRepository = stockRepository;
         this.newsRepository = newsRepository;
         this.disclosureRepository = disclosureRepository;
+        this.priceMoveRepository = priceMoveRepository;
     }
 
     // GET /api/feed?stockCode=AAPL 또는 ?industry=Semiconductors (둘 다 없으면 전체)
@@ -60,7 +63,14 @@ class FeedController {
                 .map(d -> new FeedItem("DISCLOSURE", d.getStockCode(), names.get(d.getStockCode()),
                         "DART", d.getReportNm(), d.getFlrNm() + " 제출", d.getUrl(), d.getCollectedAt()));
 
-        return Stream.concat(news, disclosures)
+        Stream<FeedItem> moves = priceMoveRepository.findByStockCodeInAndDetectedAtAfter(names.keySet(), since).stream()
+                .map(m -> new FeedItem("MOVE", m.getStockCode(), names.get(m.getStockCode()), "토스증권",
+                        String.format("%s 전일 대비 %+.2f%% %s", names.get(m.getStockCode()), m.getChangeRate(),
+                                m.getChangeRate().signum() > 0 ? "급등" : "급락"),
+                        "현재가 " + m.getLastPrice().toPlainString() + " " + m.getCurrency() + " · 눌러서 관련 뉴스 보기",
+                        null, m.getDetectedAt()));
+
+        return Stream.of(moves, news, disclosures).flatMap(s -> s)
                 .sorted(Comparator.comparing(FeedItem::at, Comparator.reverseOrder()))
                 .limit(MAX_ITEMS)
                 .toList();

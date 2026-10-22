@@ -38,6 +38,9 @@
   .badge { font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px; color: #fff; }
   .badge.NEWS { background: var(--news); }
   .badge.DISCLOSURE { background: var(--disc); }
+  .badge.MOVE { background: #dc2626; }
+  .item.MOVE { background: #fff7ed; border-radius: 8px; cursor: pointer; }
+  .item.MOVE .title { font-weight: 700; margin: 4px 0; }
   .item a { display: block; color: var(--text); text-decoration: none; font-weight: 600; margin: 4px 0; }
   .item a:hover { color: var(--accent); }
   .item p { margin: 0; font-size: 13px; color: var(--muted); }
@@ -65,7 +68,7 @@
 <script>
   // selected: null(전체) | { stockCode, label } | { industry, label }
   let selected = null;
-  const LABEL = { NEWS: '뉴스', DISCLOSURE: '공시' };
+  const LABEL = { NEWS: '뉴스', DISCLOSURE: '공시', MOVE: '변동' };
   const NO_INDUSTRY = '분류 없음';
 
   // 외부 데이터(기사 제목 등)는 innerHTML 대신 textContent로만 넣는다
@@ -136,13 +139,19 @@
       feed.replaceChildren(el('div', { className: 'empty', textContent: '아직 모인 정보가 없습니다. 종목을 추가하거나 다음 수집(10분)을 기다려 주세요.' }));
       return;
     }
-    feed.replaceChildren(...items.map(i => el('div', { className: 'item' },
+    feed.replaceChildren(...items.map(i => el('div', {
+        className: 'item ' + i.type,
+        // 변동 항목을 누르면 그 종목 피드(관련 뉴스)로 이동
+        onclick: i.type === 'MOVE' ? () => select({ stockCode: i.stockCode, label: i.stockName }) : null,
+      },
       el('div', { className: 'meta' },
         el('span', { className: 'badge ' + i.type, textContent: LABEL[i.type] }),
         el('span', { textContent: i.stockName }),
         el('span', { textContent: i.source ?? '' }),
         el('span', { textContent: new Date(i.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) })),
-      el('a', { href: i.url, target: '_blank', rel: 'noopener noreferrer', textContent: i.title }),
+      i.url
+        ? el('a', { href: i.url, target: '_blank', rel: 'noopener noreferrer', textContent: i.title })
+        : el('div', { className: 'title', textContent: i.title }),
       el('p', { textContent: i.summary }))));
   }
 
