@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>종목 브리핑</title>
-<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <style>
   :root { --bg: #f6f7f9; --card: #fff; --text: #1a1d21; --muted: #6b7280; --line: #e5e7eb; --accent: #2563eb; --news: #0f766e; --disc: #b45309; }
   * { box-sizing: border-box; }
@@ -45,7 +44,7 @@
   .item a { display: block; color: var(--text); text-decoration: none; font-weight: 600; margin: 4px 0; }
   .item a:hover { color: var(--accent); }
   .item p { margin: 0; font-size: 13px; color: var(--muted); }
-  #chart { height: 280px; margin-bottom: 12px; }
+  #chart { height: 420px; margin-bottom: 12px; }
   #chart[hidden] { display: none; }
   #live { font-size: 12px; color: var(--muted); }
   .empty { color: var(--muted); padding: 24px; text-align: center; }
@@ -103,38 +102,29 @@
 
   function withCode(box, code) { box.dataset.code = code; return box; }
 
-  // 1분봉 차트. 차트 라이브러리는 UTC로 그리므로 시각에 9시간을 더해 한국 시간으로 보이게 한다
-  const KST = 9 * 3600;
-  let chart = null, series = null, chartCode = null, lastBar = null;
+  // 차트는 TradingView 위젯 (TradingView 자체 시세로 실시간 갱신). 국내 종목은 KRX: 접두어
+  let chartCode = null;
 
-  async function loadChart() {
+  function loadChart() {
     const code = selected?.stockCode ?? null;
     const box = document.getElementById('chart');
     box.hidden = !code;
     if (code === chartCode) return;
-    chartCode = code; lastBar = null;
-    chart?.remove(); chart = series = null;
+    chartCode = code;
+    box.replaceChildren();
     if (!code) return;
-    chart = LightweightCharts.createChart(box, { autoSize: true, timeScale: { timeVisible: true } });
-    series = chart.addCandlestickSeries({ upColor: '#dc2626', downColor: '#2563eb', borderVisible: false,
-      wickUpColor: '#dc2626', wickDownColor: '#2563eb' });
-    const res = await fetch('/api/candles?symbol=' + encodeURIComponent(code));
-    if (!res.ok || chartCode !== code) return;
-    const bars = (await res.json()).map(b => ({ time: b.time + KST, open: +b.open, high: +b.high, low: +b.low, close: +b.close }));
-    series.setData(bars);
-    lastBar = bars.at(-1) ?? null;
-  }
-
-  // 체결 한 건으로 현재 분봉을 갱신하거나 새 분봉을 연다
-  function onTradeChart(q) {
-    if (q.stockCode !== chartCode || !lastBar) return;
-    const price = +q.lastPrice;
-    const time = Math.floor(Date.parse(q.timestamp) / 60000) * 60 + KST;
-    if (time < lastBar.time) return; // 늦게 도착한 체결
-    lastBar = time === lastBar.time
-      ? { ...lastBar, high: Math.max(lastBar.high, price), low: Math.min(lastBar.low, price), close: price }
-      : { time, open: price, high: price, low: price, close: price };
-    series.update(lastBar);
+    const widget = el('div', { className: 'tradingview-widget-container__widget' });
+    widget.style.height = '100%';
+    const script = el('script', {
+      src: 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js', async: true,
+      textContent: JSON.stringify({
+        symbol: /^\d{6}$/.test(code) ? 'KRX:' + code : code,
+        interval: '1', timezone: 'Asia/Seoul', locale: 'kr', theme: 'light', style: '1',
+        autosize: true, allow_symbol_change: false, hide_side_toolbar: true,
+      }),
+    });
+    box.append(el('div', { className: 'tradingview-widget-container' }, widget, script));
+    box.firstChild.style.height = '100%';
   }
 
   function stockRow(s, q) {
@@ -226,7 +216,6 @@
     document.querySelectorAll('.quote').forEach(old => {
       if (old.dataset.code === q.stockCode) old.replaceWith(withCode(quoteBox(q), q.stockCode));
     });
-    onTradeChart(q);
   });
   stream.addEventListener('move', () => loadFeed());
 
