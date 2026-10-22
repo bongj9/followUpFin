@@ -50,10 +50,19 @@ public class TossClient {
 
     // 일봉. 최신 봉부터 온다고 문서에 있지만 정렬은 호출하는 쪽에서 다시 한다
     public List<Candle> dailyCandles(String symbol, int count) {
+        return candles(symbol, "1d", count);
+    }
+
+    // 1분봉 (최대 200개)
+    public List<Candle> minuteCandles(String symbol, int count) {
+        return candles(symbol, "1m", count);
+    }
+
+    private List<Candle> candles(String symbol, String interval, int count) {
         return call(token -> restClient.get()
                 .uri(u -> u.path("/api/v1/candles")
                         .queryParam("symbol", symbol)
-                        .queryParam("interval", "1d")
+                        .queryParam("interval", interval)
                         .queryParam("count", count)
                         .build())
                 .header("Authorization", "Bearer " + token)
@@ -73,8 +82,8 @@ public class TossClient {
         }
     }
 
-    // 클라이언트당 유효 토큰은 1개, refresh token 없음. 만료 1분 전까지 재사용
-    private synchronized String token() {
+    // 클라이언트당 유효 토큰은 1개, refresh token 없음. 만료 1분 전까지 재사용 (웹소켓 연결도 같은 토큰)
+    public synchronized String token() {
         if (Instant.now().isBefore(expiresAt.minusSeconds(60))) {
             return accessToken;
         }
@@ -93,7 +102,7 @@ public class TossClient {
         return accessToken;
     }
 
-    private synchronized void invalidateToken() {
+    public synchronized void invalidateToken() {
         expiresAt = Instant.EPOCH;
     }
 
@@ -114,6 +123,7 @@ public class TossClient {
     record CandlePage(List<Candle> candles) {
     }
 
-    public record Candle(String timestamp, String closePrice) {
+    public record Candle(String timestamp, String openPrice, String highPrice, String lowPrice, String closePrice,
+                         String volume) {
     }
 }

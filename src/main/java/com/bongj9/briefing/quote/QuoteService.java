@@ -6,29 +6,35 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
 public class QuoteService {
 
+    // 전일 종가는 하루에 한 번 바뀌지만 바뀌는 시각(토스 일봉 경계)이 자정이 아니라서 날짜 대신 짧은 TTL로 캐시
+    private static final Duration PREV_CLOSE_TTL = Duration.ofMinutes(10);
+
     private final TossClient toss;
     private final FollowedStockRepository stockRepository;
     private final BigDecimal bigMovePercent;
+    private final Map<String, CachedClose> prevCloses = new ConcurrentHashMap<>();
 
     QuoteService(TossClient toss, FollowedStockRepository stockRepository,
-                    @Value("${briefing.big-move-percent}") BigDecimal bigMovePercent) {
+                 @Value("${briefing.big-move-percent}") BigDecimal bigMovePercent) {
         this.toss = toss;
         this.stockRepository = stockRepository;
         this.bigMovePercent = bigMovePercent;
     }
 
-    // 팔로우 종목 현재가 + 전일 대비 등락률
-    // ponytail: 요청마다 토스 호출 (현재가 1회 + 종목당 일봉 1회). 종목이 20개를 넘으면 일봉 초당 한도(20회)에 걸리니 전일 종가를 하루 캐시
+    // 팔로우 종목 현재가 + 전일 대비 등락률 (현재가 1회 호출, 전일 종가는 캐시)
     public List<Quote> quotes() {
         List<String> codes = stockRepository.findAll().stream().map(FollowedStock::getStockCode).toList();
         if (!toss.isConfigured() || codes.isEmpty()) {
@@ -38,24 +44,40 @@ public class QuoteService {
                 .collect(Collectors.toMap(TossClient.Price::symbol, Function.identity()));
         return codes.stream()
                 .filter(prices::containsKey)
-                .map(code -> toQuote(prices.get(code)))
+                .map(code -> {
+                    TossClient.Price p = prices.get(code);
+                    return toQuote(p.symbol(), new BigDecimal(p.lastPrice()), p.currency(), p.timestamp());
+                })
                 .toList();
     }
 
-    private Quote toQuote(TossClient.Price price) {
-        BigDecimal last = new BigDecimal(price.lastPrice());
-        BigDecimal prevClose = prevClose(price.symbol());
+    // 웹소켓 체결 한 건을 시세로 변환
+    public Quote toQuote(String symbol, BigDecimal last, String currency, String timestamp) {
+        BigDecimal prevClose = prevClose(symbol);
         BigDecimal rate = Quote.changeRate(last, prevClose);
-        return new Quote(price.symbol(), last, prevClose, Quote.change(last, prevClose), rate, price.currency(), price.timestamp(),
+        return new Quote(symbol, last, prevClose, Quote.change(last, prevClose), rate, currency, timestamp,
                 Quote.isBigMove(rate, bigMovePercent));
     }
 
-    // 최근 일봉 2개 중 이전 봉의 종가. 장 시작 전에는 어제 봉이 최신이라 그제 대비가 되는데, 토스 앱도 같은 방식으로 보여준다
     private BigDecimal prevClose(String symbol) {
+        CachedClose cached = prevCloses.get(symbol);
+        if (cached != null && cached.fetchedAt().plus(PREV_CLOSE_TTL).isAfter(Instant.now())) {
+            return cached.value();
+        }
+        BigDecimal value = fetchPrevClose(symbol);
+        prevCloses.put(symbol, new CachedClose(value, Instant.now()));
+        return value;
+    }
+
+    // 최근 일봉 2개 중 이전 봉의 종가. 장 시작 전에는 어제 봉이 최신이라 그제 대비가 되는데, 토스 앱도 같은 방식으로 보여준다
+    private BigDecimal fetchPrevClose(String symbol) {
         List<TossClient.Candle> candles = toss.dailyCandles(symbol, 2).stream()
                 .filter(Objects::nonNull)
                 .sorted(Comparator.comparing(TossClient.Candle::timestamp).reversed())
                 .toList();
         return candles.size() < 2 ? null : new BigDecimal(candles.get(1).closePrice());
+    }
+
+    private record CachedClose(BigDecimal value, Instant fetchedAt) {
     }
 }

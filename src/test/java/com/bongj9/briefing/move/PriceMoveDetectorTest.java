@@ -33,7 +33,14 @@ class PriceMoveDetectorTest {
 
         assertThat(detector.detect()).extracting(PriceMove::getStockCode).containsExactly("AMD");
         assertThat(detector.detect()).isEmpty(); // 10분 뒤 다시 확인해도 오늘은 이미 기록됨
-        assertThat(repository.count()).isEqualTo(1);
+        assertThat(repository.findAll()).filteredOn(m -> m.getStockCode().equals("AMD")).hasSize(1);
+    }
+
+    @Test
+    void 체결마다_확인해도_하루_한_번만_기록한다() {
+        assertThat(detector.check(quote("NVDA", "5.10", true))).isPresent();
+        assertThat(detector.check(quote("NVDA", "5.30", true))).isEmpty();
+        assertThat(detector.check(quote("TSLA", "1.00", false))).isEmpty();
     }
 
     private Quote quote(String code, String rate, boolean bigMove) {

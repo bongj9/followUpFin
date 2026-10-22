@@ -4,6 +4,7 @@ import com.bongj9.briefing.news.FinnhubClient;
 import com.bongj9.briefing.news.NewsCollector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,11 +24,14 @@ class StockController {
     private final FollowedStockRepository repository;
     private final NewsCollector newsCollector;
     private final FinnhubClient finnhub;
+    private final ApplicationEventPublisher events;
 
-    StockController(FollowedStockRepository repository, NewsCollector newsCollector, FinnhubClient finnhub) {
+    StockController(FollowedStockRepository repository, NewsCollector newsCollector, FinnhubClient finnhub,
+                    ApplicationEventPublisher events) {
         this.repository = repository;
         this.newsCollector = newsCollector;
         this.finnhub = finnhub;
+        this.events = events;
     }
 
     @GetMapping("/api/stocks")
@@ -56,6 +60,7 @@ class StockController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "종목명을 입력하세요");
         }
         FollowedStock stock = repository.save(new FollowedStock(code, name, industry));
+        events.publishEvent(new FollowedStocksChanged());
         // 다음 수집 주기까지 기다리지 않도록 바로 한 번 수집
         try {
             newsCollector.collect(stock);
@@ -68,6 +73,7 @@ class StockController {
     @DeleteMapping("/api/stocks/{stockCode}")
     void unfollow(@PathVariable String stockCode) {
         repository.deleteById(stockCode);
+        events.publishEvent(new FollowedStocksChanged());
     }
 
     record FollowRequest(String stockCode, String name) {
