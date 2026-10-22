@@ -45,17 +45,27 @@
   .item a { display: block; color: var(--text); text-decoration: none; font-weight: 600; margin: 4px 0; }
   .item a:hover { color: var(--accent); }
   .item p { margin: 0; font-size: 13px; color: var(--muted); }
-  #chartBox { margin-bottom: 12px; }
+  #chartBox { margin-bottom: 12px; border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
   #chartBox[hidden] { display: none; }
+  #chartBox:fullscreen { background: var(--card); padding: 16px; display: flex; flex-direction: column; }
+  #chartBox:fullscreen #chartWrap { flex: 1; height: auto !important; }
+  #toolbar { position: relative; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px; padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1px solid var(--line); }
+  #toolbar .group { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
+  #toolbar button, #toolbar select { border: 0; background: none; border-radius: 6px; padding: 5px 9px; font-size: 13px; cursor: pointer; color: var(--text); font-family: inherit; }
+  #toolbar button:hover, #toolbar select:hover { background: var(--bg); }
+  #toolbar .active { background: #eef0f3; font-weight: 700; }
+  #toolbar .sep { width: 1px; height: 18px; background: var(--line); margin: 0 6px; }
+  #toolbar .menu { position: absolute; right: 0; top: 100%; z-index: 10; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; box-shadow: 0 6px 20px rgba(0,0,0,0.1); display: grid; gap: 8px; font-size: 13px; min-width: 180px; }
+  #toolbar .menu label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
   #chartWrap { position: relative; height: 420px; }
   #chart { height: 100%; }
-  #legend { position: absolute; top: 4px; left: 6px; z-index: 3; pointer-events: none; font-size: 12px; display: flex; flex-wrap: wrap; gap: 4px 10px; background: rgba(255,255,255,0.8); padding: 2px 4px; border-radius: 4px; }
-  #legend .up { color: #dc2626; } #legend .down { color: #2563eb; }
-  #intervals { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; align-items: center; }
-  #intervals .sep { width: 1px; height: 18px; background: var(--line); margin: 0 6px; }
-  #intervals button.ind.active { background: var(--card); color: var(--text); border-color: var(--text); font-weight: 600; }
-  #intervals button { border: 1px solid var(--line); background: var(--card); border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; color: var(--muted); }
-  #intervals button.active { background: var(--text); border-color: var(--text); color: #fff; }
+  #legend { position: absolute; top: 4px; left: 6px; z-index: 3; pointer-events: none; font-size: 12px; display: flex; flex-direction: column; gap: 3px; }
+  #legend .row { display: flex; gap: 6px; align-items: center; background: rgba(255,255,255,0.85); padding: 1px 4px; border-radius: 4px; width: fit-content; }
+  #legend .row button { pointer-events: auto; border: 0; background: #f1f3f5; border-radius: 4px; width: 18px; height: 18px; font-size: 11px; line-height: 18px; cursor: pointer; color: var(--muted); padding: 0; }
+  #legend .row.off span { opacity: 0.35; }
+  #legend .up, #measure.up { color: #dc2626; } #legend .down, #measure.down { color: #2563eb; }
+  #measure { position: absolute; z-index: 4; font-size: 12px; font-weight: 700; background: #fff; border: 1px solid currentColor; border-radius: 6px; padding: 2px 6px; pointer-events: none; white-space: nowrap; }
+  #measure[hidden] { display: none; }
   #live { font-size: 12px; color: var(--muted); }
   .empty { color: var(--muted); padding: 24px; text-align: center; }
 </style>
@@ -75,7 +85,7 @@
   </aside>
   <section>
     <h2 id="feedTitle">전체 피드</h2>
-    <div id="chartBox" hidden><div id="intervals"></div><div id="chartWrap"><div id="legend"></div><div id="chart"></div></div></div>
+    <div id="chartBox" hidden><div id="toolbar"></div><div id="chartWrap"><div id="legend"></div><div id="measure" hidden></div><div id="chart"></div></div></div>
     <div id="feed"></div>
   </section>
 </main>
@@ -112,17 +122,19 @@
 
   function withCode(box, code) { box.dataset.code = code; return box; }
 
-  // 차트 (토스 시세, TradingView 오픈소스 Lightweight Charts). 상승 빨강·하락 파랑
-  // 틱: 체결 하나당 점 하나. 캔들: 지표를 골라 켜고 끈다 (RSI·MACD·거래량은 아래 별도 칸)
-  // 차트 라이브러리는 UTC로 그리므로 시각은 한국 시간으로 옮겨서 넣는다 (캔들은 서버가 이미 옮겨서 줌)
+  // 차트 (토스 시세, TradingView 오픈소스 Lightweight Charts). 토스증권 차트처럼 툴바·보조지표·그리기·자·종목비교
+  // 상승 빨강·하락 파랑. 차트 라이브러리는 UTC로 그리므로 시각은 한국 시간으로 옮겨서 넣는다 (캔들은 서버가 이미 옮겨서 줌)
   const LC = LightweightCharts;
   const KST = 9 * 3600;
   const UP = '#dc2626', DOWN = '#2563eb';
-  const INTERVALS = [['tick', '틱'], ['1m', '1분'], ['5m', '5분'], ['15m', '15분'], ['30m', '30분'], ['1h', '1시간'], ['1d', '일']];
+  const INTRADAY = [['tick', '틱'], ['1m', '1분'], ['5m', '5분'], ['15m', '15분'], ['30m', '30분'], ['1h', '1시간']];
+  const PERIODS = [['1d', '일'], ['1w', '주'], ['1M', '월'], ['1y', '년']];
   const BUCKET = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600 };
-  const PANE_HEIGHT = 110;
+  const COMPARE_COLORS = ['#f97316', '#10b981', '#a855f7', '#0ea5e9'];
+  const MAIN_HEIGHT = 420, PANE_HEIGHT = 110;
+  let stockList = [];
 
-  // 지표 계산. 결과는 봉과 같은 길이의 배열, 계산이 안 되는 앞부분은 null
+  // 지표 계산. 결과는 봉과 같은 길이의 배열, 계산이 안 되는 자리는 null
   const closes = bars => bars.map(b => b.close);
   function sma(vals, n) {
     let sum = 0;
@@ -157,79 +169,179 @@
   }
   const macdSignal = vals => ema(macd(vals), 9);
   const macdHist = vals => { const m = macd(vals), s = macdSignal(vals); return m.map((v, i) => v == null || s[i] == null ? null : v - s[i]); };
+  // n개 봉의 (최고가 + 최저가) / 2. 일목균형표용
+  const midRange = (bars, n) => bars.map((_, i) => {
+    if (i < n - 1) return null;
+    const w = bars.slice(i - n + 1, i + 1);
+    return (Math.max(...w.map(b => b.high)) + Math.min(...w.map(b => b.low))) / 2;
+  });
+  // k > 0: k봉 앞으로 밀기 (선행), k < 0: 뒤로 당기기 (후행)
+  const shift = (vals, k) => vals.map((_, i) => vals[i - k] ?? null);
   const tone = (v, up) => ({ value: v, color: up ? 'rgba(220,38,38,0.4)' : 'rgba(37,99,235,0.4)' });
 
-  // pane: 별도 칸에 그리는 지표. series: [종류, 옵션, 봉 배열 → 값 배열]
-  const line = (color, calc, width = 1) => [LC.LineSeries, { color, lineWidth: width }, calc];
+  // 보조지표. pane: 아래 별도 칸. lines의 label은 범례에 색깔 숫자로 표시
   const INDICATORS = [
-    { key: 'ma5', label: 'MA5', series: [line('#16a34a', b => sma(closes(b), 5))] },
-    { key: 'ma20', label: 'MA20', series: [line('#f59e0b', b => sma(closes(b), 20))] },
-    { key: 'ma60', label: 'MA60', series: [line('#8b5cf6', b => sma(closes(b), 60))] },
-    { key: 'ma120', label: 'MA120', series: [line('#9ca3af', b => sma(closes(b), 120))] },
-    { key: 'bb', label: '볼린저밴드', series: [
-      line('#0ea5e9', b => bollinger(closes(b), 20, 1)), line('#0ea5e9', b => sma(closes(b), 20)), line('#0ea5e9', b => bollinger(closes(b), 20, -1))] },
-    { key: 'volume', label: '거래량', pane: true, series: [
-      [LC.HistogramSeries, { priceFormat: { type: 'volume' } }, b => b.map(x => tone(x.volume, x.close >= x.open))],
-      line('#f59e0b', b => sma(b.map(x => x.volume), 20))] },
-    { key: 'rsi', label: 'RSI', pane: true, series: [line('#7c3aed', b => rsi(closes(b)))] },
-    { key: 'macd', label: 'MACD', pane: true, series: [
-      [LC.HistogramSeries, {}, b => macdHist(closes(b)).map(v => v == null ? null : tone(v, v >= 0))],
-      line('#2563eb', b => macd(closes(b))), line('#f97316', b => macdSignal(closes(b)))] },
+    { key: 'ma', name: '이동평균선', lines: [[5, '#16a34a'], [20, '#dc2626'], [60, '#f59e0b'], [120, '#8b5cf6']]
+        .map(([n, color]) => ({ label: n, color, calc: b => sma(closes(b), n) })) },
+    { key: 'bb', name: '볼린저밴드', lines: [
+      { label: '20', color: '#0ea5e9', calc: b => sma(closes(b), 20) },
+      { label: '2', color: '#0ea5e9', calc: b => bollinger(closes(b), 20, 1) },
+      { color: '#0ea5e9', calc: b => bollinger(closes(b), 20, -1) }] },
+    { key: 'ichimoku', name: '일목균형표', lines: [
+      { label: '0', color: '#f59e0b', calc: b => midRange(b, 9) },   // 전환선
+      { label: '1', color: '#16a34a', calc: b => midRange(b, 26) },  // 기준선
+      { label: '2', color: '#9ca3af', calc: b => shift(closes(b), -26) }, // 후행스팬
+      { label: '3', color: '#dc2626', calc: b => { const t = midRange(b, 9), k = midRange(b, 26); return shift(t.map((v, i) => v == null || k[i] == null ? null : (v + k[i]) / 2), 26); } }, // 선행스팬1
+      { label: '4', color: '#2563eb', calc: b => shift(midRange(b, 52), 26) }] }, // 선행스팬2
+    { key: 'volume', name: '거래량', pane: true, lines: [
+      { type: LC.HistogramSeries, options: { priceFormat: { type: 'volume' } }, calc: b => b.map(x => tone(x.volume, x.close >= x.open)) },
+      { label: '20', color: '#f59e0b', calc: b => sma(b.map(x => x.volume), 20) }] },
+    { key: 'rsi', name: 'RSI', pane: true, lines: [{ label: '14', color: '#7c3aed', calc: b => rsi(closes(b)) }] },
+    { key: 'macd', name: 'MACD', pane: true, lines: [
+      { type: LC.HistogramSeries, calc: b => macdHist(closes(b)).map(v => v == null ? null : tone(v, v >= 0)) },
+      { label: '12', color: '#2563eb', calc: b => macd(closes(b)) },
+      { label: '26 9', color: '#f97316', calc: b => macdSignal(closes(b)) }] },
   ];
-  let enabled = new Set(['ma5', 'ma20', 'ma60', 'ma120', 'volume']);
-  try { const saved = JSON.parse(localStorage.getItem('indicators')); if (Array.isArray(saved)) enabled = new Set(saved); } catch {}
 
-  let interval = '1m';
-  let view = null; // { code, interval, chart, series, bars, plots: [{ indicator, series, calc }], times }
+  // 차트 설정은 브라우저에 기억 (없거나 막혀 있으면 기본값)
+  const prefs = { interval: '1m', intraday: '1m', type: 'candle', on: ['ma', 'volume'], hidden: [] };
+  try { Object.assign(prefs, JSON.parse(localStorage.getItem('chartPrefs')) ?? {}); } catch {}
+  const savePrefs = () => { try { localStorage.setItem('chartPrefs', JSON.stringify(prefs)); } catch {} };
+
+  let view = null;   // { code, interval, type, chart, main, plots, bars, compares, hover }
+  let menu = null;   // 'ind' | 'compare'
+  let tool = null;   // 'draw' | 'measure'
+  let pending = null; // 그리기·자의 첫 번째 클릭 지점
+  let compares = [];  // 비교 중인 종목 코드
+  let measureSeries = null;
+  const drawings = new Map(); // '종목|주기' → [[점1, 점2], ...] (새로고침하면 사라짐)
 
   const point = (time, v) => typeof v === 'object' ? { time, ...v } : { time, value: v };
+  const toData = (bars, vals) => vals.flatMap((val, i) => val == null ? [] : [point(bars[i].time, val)]);
   const fmt = n => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  const colored = (text, color) => { const e = el('span', { textContent: text }); e.style.color = color; return e; };
+  const drawKey = () => view?.code + '|' + prefs.interval;
+  const btn = (text, onclick, active = false, title = '') => el('button', { textContent: text, onclick, title, className: active ? 'active' : '' });
 
   function renderToolbar() {
-    const intervalButtons = INTERVALS.map(([key, label]) =>
-      el('button', { textContent: label, className: key === interval ? 'active' : '',
-        onclick: () => { interval = key; loadChart(); } }));
-    const indicatorButtons = interval === 'tick' ? [] : [el('span', { className: 'sep' }), ...INDICATORS.map(ind =>
-      el('button', { textContent: ind.label, className: 'ind' + (enabled.has(ind.key) ? ' active' : ''),
-        onclick: () => {
-          enabled.has(ind.key) ? enabled.delete(ind.key) : enabled.add(ind.key);
-          try { localStorage.setItem('indicators', JSON.stringify([...enabled])); } catch {}
-          loadChart(true);
-        } }))];
-    document.getElementById('intervals').replaceChildren(...intervalButtons, ...indicatorButtons);
+    const intraday = INTRADAY.some(([k]) => k === prefs.interval);
+    const select = el('select', { className: intraday ? 'active' : '', title: '분·틱 단위', onchange: e => changeInterval(e.target.value) },
+      ...INTRADAY.map(([k, label]) => el('option', { value: k, textContent: label, selected: k === prefs.intraday })));
+    const left = [select, ...PERIODS.map(([k, label]) => btn(label, () => changeInterval(k), k === prefs.interval)),
+      el('span', { className: 'sep' }),
+      btn(prefs.type === 'candle' ? '캔들' : '라인', () => { prefs.type = prefs.type === 'candle' ? 'line' : 'candle'; savePrefs(); loadChart(true); }, false, '차트 종류 바꾸기'),
+      btn('지우기', () => { drawings.delete(drawKey()); loadChart(true); }, false, '그린 선과 자 지우기')];
+    const right = [
+      btn('+ 보조지표', () => toggleMenu('ind'), menu === 'ind'),
+      btn('그리기', () => setTool('draw'), tool === 'draw', '두 지점을 클릭해 추세선 긋기'),
+      btn('자', () => setTool('measure'), tool === 'measure', '두 지점을 클릭해 등락률·봉 개수 재기'),
+      btn('종목비교', () => toggleMenu('compare'), menu === 'compare' || compares.length > 0),
+      btn('차트 크게보기', () => document.fullscreenElement ? document.exitFullscreen() : document.getElementById('chartBox').requestFullscreen()),
+    ];
+    document.getElementById('toolbar').replaceChildren(
+      el('div', { className: 'group' }, ...left), el('div', { className: 'group' }, ...right), menuPanel());
   }
 
-  function showLegend(v, bar) {
+  function menuPanel() {
+    if (menu === 'ind') {
+      return el('div', { className: 'menu' }, ...INDICATORS.map(ind => el('label', {},
+        el('input', { type: 'checkbox', checked: prefs.on.includes(ind.key), onchange: () => toggleIndicator(ind.key) }), ind.name)));
+    }
+    if (menu === 'compare') {
+      const others = stockList.filter(s => s.stockCode !== selected?.stockCode);
+      return el('div', { className: 'menu' }, ...(others.length
+        ? others.map(s => el('label', {}, el('input', { type: 'checkbox', checked: compares.includes(s.stockCode),
+            onchange: () => toggleCompare(s.stockCode) }), s.name + ' ' + s.stockCode))
+        : [el('span', { textContent: '비교할 다른 팔로우 종목이 없어요' })]));
+    }
+    return '';
+  }
+
+  // 메뉴 밖을 누르면 닫기
+  document.addEventListener('click', e => {
+    // 툴바는 클릭할 때마다 다시 그려져서 눌린 요소가 이미 빠져 있을 수 있다 (isConnected)
+    if (menu && e.target.isConnected && !e.target.closest('#toolbar')) { menu = null; renderToolbar(); }
+  });
+
+  function toggleMenu(m) { menu = menu === m ? null : m; renderToolbar(); }
+  function setTool(t) {
+    tool = tool === t ? null : t;
+    pending = null;
+    document.getElementById('chart').style.cursor = tool ? 'crosshair' : '';
+    renderToolbar();
+  }
+  function changeInterval(k) {
+    prefs.interval = k;
+    if (INTRADAY.some(([key]) => key === k)) prefs.intraday = k;
+    savePrefs();
+    loadChart();
+  }
+  function toggleIndicator(key) {
+    prefs.on = prefs.on.includes(key) ? prefs.on.filter(k => k !== key) : [...prefs.on, key];
+    prefs.hidden = prefs.hidden.filter(k => k !== key);
+    savePrefs();
+    loadChart(true);
+  }
+  function toggleHidden(key) {
+    prefs.hidden = prefs.hidden.includes(key) ? prefs.hidden.filter(k => k !== key) : [...prefs.hidden, key];
+    savePrefs();
+    view?.plots.filter(p => p.ind.key === key).forEach(p => p.series.applyOptions({ visible: !prefs.hidden.includes(key) }));
+    renderLegend(view, view?.bars?.at(-1));
+  }
+  function toggleCompare(code) {
+    compares = compares.includes(code) ? compares.filter(c => c !== code) : [...compares, code];
+    loadChart(true);
+  }
+
+  // 범례: 시작·고가·저가·종가 + 지표마다 [보기/숨기기] [삭제] 이름 숫자
+  function renderLegend(v, bar) {
     const box = document.getElementById('legend');
-    if (!v || !bar) { box.replaceChildren(); return; }
-    const i = v.bars.indexOf(bar);
-    const dir = bar.close >= bar.open ? 'up' : 'down';
-    const maValues = v.plots.filter(p => /^ma\d/.test(p.indicator.key)).map(p => {
-      const val = p.calc(v.bars)[i];
-      const e = el('span', { textContent: p.indicator.label + ' ' + (val == null ? '-' : fmt(val)) });
-      e.style.color = p.options.color;
-      return e;
-    });
-    box.replaceChildren(
-      ...[['시', bar.open], ['고', bar.high], ['저', bar.low], ['종', bar.close]].map(([k, val]) =>
-        el('span', {}, k + ' ', el('b', { className: dir, textContent: fmt(val) }))),
-      el('span', { textContent: '거래량 ' + bar.volume.toLocaleString('en-US') }),
-      ...maValues);
+    if (!v?.bars || !bar) { box.replaceChildren(); return; }
+    const prev = v.bars[v.bars.indexOf(bar) - 1];
+    const base = prev?.close ?? bar.open;
+    const dir = val => val >= base ? 'up' : 'down';
+    const rate = prev ? (bar.close / prev.close - 1) * 100 : null;
+    const rows = [el('div', { className: 'row' },
+      ...[['시작', bar.open], ['고가', bar.high], ['저가', bar.low], ['종가', bar.close]].map(([k, val]) =>
+        el('span', {}, k + ' ', el('b', { className: dir(val), textContent: fmt(val) }))),
+      rate == null ? '' : el('b', { className: dir(bar.close), textContent: (rate >= 0 ? '+' : '') + rate.toFixed(2) + '%' }),
+      el('span', { textContent: '거래량 ' + bar.volume.toLocaleString('en-US') }))];
+    for (const ind of INDICATORS.filter(ind => v.plots.some(p => p.ind === ind))) {
+      const hidden = prefs.hidden.includes(ind.key);
+      rows.push(el('div', { className: 'row' + (hidden ? ' off' : '') },
+        btn(hidden ? '○' : '●', () => toggleHidden(ind.key), false, hidden ? '보이기' : '숨기기'),
+        btn('×', () => toggleIndicator(ind.key), false, '지표 삭제'),
+        el('span', { textContent: ind.name }),
+        ...ind.lines.filter(l => l.label).map(l => colored(String(l.label), l.color))));
+    }
+    for (const c of v.compares) {
+      rows.push(el('div', { className: 'row' }, btn('×', () => toggleCompare(c.code), false, '비교 해제'), colored('비교 ' + c.code + ' (%)', c.color)));
+    }
+    box.replaceChildren(...rows);
+  }
+
+  async function fetchBars(code, interval) {
+    const res = await fetch('/api/candles?symbol=' + encodeURIComponent(code) + '&interval=' + interval);
+    if (!res.ok) return null;
+    return (await res.json()).map(b => ({ time: b.time, open: +b.open, high: +b.high, low: +b.low, close: +b.close, volume: +b.volume }));
   }
 
   async function loadChart(force = false) {
     const code = selected?.stockCode ?? null;
     document.getElementById('chartBox').hidden = !code;
-    if (!force && code === view?.code && interval === view?.interval) return;
+    if (code !== view?.code) { compares = []; tool = null; pending = null; menu = null; }
+    if (!force && code === view?.code && prefs.interval === view?.interval) return;
+    clearMeasure();
     view?.chart.remove();
     view = null;
-    showLegend(null);
+    renderLegend(null);
     if (!code) return;
     renderToolbar();
-    const tick = interval === 'tick';
-    const panes = tick ? [] : INDICATORS.filter(ind => ind.pane && enabled.has(ind.key));
-    const wrap = document.getElementById('chartWrap');
-    wrap.style.height = (420 + panes.length * PANE_HEIGHT) + 'px';
+    const interval = prefs.interval, tick = interval === 'tick';
+    // 비교 중에는 % 눈금이라 가격 기준 지표(이동평균 등)는 빼고 아래 칸 지표만 남긴다
+    const inds = tick ? [] : INDICATORS.filter(i => prefs.on.includes(i.key) && (i.pane || !compares.length));
+    const panes = inds.filter(i => i.pane);
+    document.getElementById('chartWrap').style.height = (MAIN_HEIGHT + panes.length * PANE_HEIGHT) + 'px';
     const times = [];
     const tickLabel = i => times[i - 1] ? new Date(times[i - 1]).toLocaleTimeString('ko-KR') : '';
     const chart = LC.createChart(document.getElementById('chart'), {
@@ -237,63 +349,133 @@
       layout: { fontSize: 11, panes: { separatorColor: '#e5e7eb' } },
       grid: { vertLines: { color: '#f1f3f5' }, horzLines: { color: '#f1f3f5' } },
       crosshair: { mode: LC.CrosshairMode.Normal },
-      timeScale: tick ? { tickMarkFormatter: tickLabel } : { timeVisible: interval !== '1d' },
+      timeScale: tick ? { tickMarkFormatter: tickLabel } : { timeVisible: !!BUCKET[interval] },
       localization: tick ? { timeFormatter: tickLabel } : {},
     });
     if (tick) {
-      const series = chart.addSeries(LC.BaselineSeries, {
+      const main = chart.addSeries(LC.BaselineSeries, {
         topLineColor: UP, topFillColor1: 'rgba(220,38,38,0.2)', topFillColor2: 'rgba(220,38,38,0.02)',
         bottomLineColor: DOWN, bottomFillColor1: 'rgba(37,99,235,0.02)', bottomFillColor2: 'rgba(37,99,235,0.2)' });
-      const v = view = { code, interval, chart, series, times, plots: [] };
+      const v = view = { code, interval, chart, main, times, plots: [], compares: [] };
       const recent = await fetch('/api/ticks?symbol=' + encodeURIComponent(code)).then(r => r.json());
       if (view === v) recent.forEach(onTradeChart);
       return;
     }
-    const series = chart.addSeries(LC.CandlestickSeries, { upColor: UP, downColor: DOWN, borderVisible: false, wickUpColor: UP, wickDownColor: DOWN });
-    const plots = INDICATORS.filter(ind => enabled.has(ind.key)).flatMap(ind => {
+    const type = prefs.type;
+    const main = type === 'candle'
+      ? chart.addSeries(LC.CandlestickSeries, { upColor: UP, downColor: DOWN, borderVisible: false, wickUpColor: UP, wickDownColor: DOWN })
+      : chart.addSeries(LC.LineSeries, { color: '#111827', lineWidth: 2 });
+    const plots = inds.flatMap(ind => {
       const paneIndex = ind.pane ? panes.indexOf(ind) + 1 : 0;
-      return ind.series.map(([type, options, calc]) => ({ indicator: ind, options, calc,
-        series: chart.addSeries(type, { ...options, priceLineVisible: false, lastValueVisible: !!ind.pane, crosshairMarkerVisible: false }, paneIndex) }));
+      return ind.lines.map(line => ({ ind, line, series: chart.addSeries(line.type ?? LC.LineSeries, {
+        color: line.color, lineWidth: 1, ...line.options, priceLineVisible: false, lastValueVisible: !!ind.pane,
+        crosshairMarkerVisible: false, visible: !prefs.hidden.includes(ind.key) }, paneIndex) }));
     });
     // 높이 비율: 메인 420 : 아래 칸 110씩 (autoSize라 픽셀 대신 비율로 준다)
-    chart.panes().forEach((p, i) => p.setStretchFactor(i === 0 ? 420 : PANE_HEIGHT));
-    const v = view = { code, interval, chart, series, plots, bars: [] };
-    chart.subscribeCrosshairMove(p => showLegend(v, (p.time && v.bars.find(b => b.time === p.time)) || v.bars.at(-1)));
-    const res = await fetch('/api/candles?symbol=' + encodeURIComponent(code) + '&interval=' + interval);
-    if (!res.ok || view !== v) return;
-    v.bars = (await res.json()).map(b => ({ time: b.time, open: +b.open, high: +b.high, low: +b.low, close: +b.close, volume: +b.volume }));
-    series.setData(v.bars);
-    plots.forEach(p => p.series.setData(p.calc(v.bars).flatMap((val, i) => val == null ? [] : [point(v.bars[i].time, val)])));
-    showLegend(v, v.bars.at(-1));
+    chart.panes().forEach((p, i) => p.setStretchFactor(i === 0 ? MAIN_HEIGHT : PANE_HEIGHT));
+    const v = view = { code, interval, type, chart, main, plots, bars: [], compares: [], hover: false };
+    chart.subscribeCrosshairMove(p => {
+      v.hover = p.time != null;
+      renderLegend(v, (p.time != null && v.bars.find(b => b.time === p.time)) || v.bars.at(-1));
+    });
+    chart.subscribeClick(p => onChartClick(v, p));
+    chart.subscribeDblClick(p => onChartClick(v, p)); // 빠르게 두 번 누르면 두 번째는 더블클릭으로만 온다
+    const [bars, ...others] = await Promise.all([code, ...compares].map(c => fetchBars(c, interval)));
+    if (view !== v || !bars) return;
+    v.bars = bars;
+    main.setData(type === 'candle' ? bars : bars.map(b => ({ time: b.time, value: b.close })));
+    plots.forEach(p => p.series.setData(toData(bars, p.line.calc(bars))));
+    compares.forEach((c, i) => {
+      const color = COMPARE_COLORS[i % COMPARE_COLORS.length];
+      const series = chart.addSeries(LC.LineSeries, { color, lineWidth: 2, priceLineVisible: false });
+      series.setData((others[i] ?? []).map(b => ({ time: b.time, value: b.close })));
+      v.compares.push({ code: c, series, color, bars: others[i] ?? [] });
+    });
+    // 종목비교는 토스처럼 % 눈금 (각 선의 화면 첫 값 대비 등락률)
+    if (compares.length) main.priceScale().applyOptions({ mode: LC.PriceScaleMode.Percentage });
+    (drawings.get(drawKey()) ?? []).forEach(pts => addLine(v, pts, '#111827', LC.LineStyle.Solid));
+    renderLegend(v, bars.at(-1));
   }
 
-  // 체결 한 건 반영: 틱은 점 추가, 캔들은 현재 봉(지표 포함) 갱신 또는 새 봉
-  // ponytail: 체결마다 지표 전체를 다시 계산한다 (봉 최대 2000개라 충분히 빠름). 느려지면 마지막 값만 증분 계산할 것
-  function onTradeChart(q) {
-    const v = view;
-    if (!v || q.stockCode !== v.code) return;
-    const price = +q.lastPrice;
-    if (v.interval === 'tick') {
-      if (!v.times.length) v.series.applyOptions({ baseValue: { type: 'price', price: +(q.prevClose ?? q.lastPrice) } });
-      v.times.push(q.timestamp);
-      v.series.update({ time: v.times.length, value: price });
+  // 그리기·자: 두 번 클릭. 그리기는 추세선을 남기고, 자는 두 점 사이 등락률과 봉 개수를 보여준다
+  function onChartClick(v, p) {
+    if (!tool || !p.point || p.time == null) return;
+    const pt = { time: p.time, price: v.main.coordinateToPrice(p.point.y) };
+    if (!pending) { pending = pt; return; }
+    const [a, b] = [pending, pt].sort((x, y) => x.time - y.time);
+    pending = null;
+    if (a.time === b.time) return;
+    if (tool === 'draw') {
+      drawings.set(drawKey(), [...(drawings.get(drawKey()) ?? []), [a, b]]);
+      addLine(v, [a, b], '#111827', LC.LineStyle.Solid);
       return;
     }
-    const last = v.bars.at(-1);
-    if (!last) return;
+    clearMeasure();
+    const change = (b.price / a.price - 1) * 100;
+    // 틱 차트는 가로축이 체결 순번이라 차이가 곧 체결 수
+    const count = v.bars ? v.bars.filter(x => x.time > a.time && x.time <= b.time).length : b.time - a.time;
+    measureSeries = addLine(v, [a, b], change >= 0 ? UP : DOWN, LC.LineStyle.Dashed);
+    const box = document.getElementById('measure');
+    box.textContent = (change >= 0 ? '+' : '') + change.toFixed(2) + '% (' + (change >= 0 ? '+' : '') + fmt(b.price - a.price) + ') · ' + count + '봉';
+    box.className = change >= 0 ? 'up' : 'down';
+    box.style.left = (p.point.x + 12) + 'px';
+    box.style.top = p.point.y + 'px';
+    box.hidden = false;
+  }
+
+  function addLine(v, [a, b], color, lineStyle) {
+    const s = v.chart.addSeries(LC.LineSeries, { color, lineWidth: 2, lineStyle, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+    s.setData([{ time: a.time, value: a.price }, { time: b.time, value: b.price }]);
+    return s;
+  }
+
+  function clearMeasure() {
+    if (measureSeries && view) view.chart.removeSeries(measureSeries);
+    measureSeries = null;
+    document.getElementById('measure').hidden = true;
+  }
+
+  // 체결 한 건을 봉 배열에 반영하고 바뀐 봉을 돌려준다 (늦게 온 체결이면 null)
+  function applyTrade(bars, q, interval) {
+    const last = bars.at(-1);
+    if (!last) return null;
+    const price = +q.lastPrice;
     const t = Math.floor(Date.parse(q.timestamp) / 1000) + KST;
-    const size = BUCKET[v.interval];
-    // 일봉은 토스 거래일 경계가 자정이 아니라 새 봉을 열지 않고 마지막 봉만 갱신
+    const size = BUCKET[interval];
+    // 일·주·월·년봉은 토스 거래일 경계가 자정이 아니라 새 봉을 열지 않고 마지막 봉만 갱신
     const time = size ? t - t % size : last.time;
-    if (time < last.time) return; // 늦게 도착한 체결
+    if (time < last.time) return null;
     const qty = +(q.volume ?? 0);
     const bar = time === last.time
       ? { ...last, high: Math.max(last.high, price), low: Math.min(last.low, price), close: price, volume: last.volume + qty }
       : { time, open: price, high: price, low: price, close: price, volume: qty };
-    if (time === last.time) v.bars[v.bars.length - 1] = bar; else v.bars.push(bar);
-    v.series.update(bar);
-    v.plots.forEach(p => { const val = p.calc(v.bars).at(-1); if (val != null) p.series.update(point(time, val)); });
-    showLegend(v, bar);
+    if (time === last.time) bars[bars.length - 1] = bar; else bars.push(bar);
+    return bar;
+  }
+
+  // 체결 한 건 반영: 틱은 점 추가, 캔들은 현재 봉·지표·비교선 갱신
+  // ponytail: 체결마다 지표 전체를 다시 계산한다 (봉 최대 수천 개라 충분히 빠름). 느려지면 마지막 값만 증분 계산할 것
+  function onTradeChart(q) {
+    const v = view;
+    if (!v) return;
+    if (v.interval === 'tick') {
+      if (q.stockCode !== v.code) return;
+      if (!v.times.length) v.main.applyOptions({ baseValue: { type: 'price', price: +(q.prevClose ?? q.lastPrice) } });
+      v.times.push(q.timestamp);
+      v.main.update({ time: v.times.length, value: +q.lastPrice });
+      return;
+    }
+    for (const c of v.compares) {
+      if (c.code !== q.stockCode) continue;
+      const bar = applyTrade(c.bars, q, v.interval);
+      if (bar) c.series.update({ time: bar.time, value: bar.close });
+    }
+    if (q.stockCode !== v.code) return;
+    const bar = applyTrade(v.bars, q, v.interval);
+    if (!bar) return;
+    v.main.update(v.type === 'candle' ? bar : { time: bar.time, value: bar.close });
+    v.plots.forEach(p => { const val = p.line.calc(v.bars).at(-1); if (val != null) p.series.update(point(bar.time, val)); });
+    if (!v.hover) renderLegend(v, bar);
   }
 
   function stockRow(s, q) {
@@ -316,6 +498,7 @@
       fetch('/api/quotes').then(r => r.ok ? r.json() : []).catch(() => []),
     ]);
     const quoteOf = new Map(quotes.map(q => [q.stockCode, q]));
+    stockList = stocks;
     const groups = Map.groupBy(stocks, s => s.industry ?? NO_INDUSTRY);
     const box = document.getElementById('stocks');
     box.replaceChildren(el('div', { className: 'stock' + (selected ? '' : ' active'), textContent: '전체', onclick: () => select(null) }));
