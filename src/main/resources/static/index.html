@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>종목 브리핑</title>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <style>
   :root { --bg: #f6f7f9; --card: #fff; --text: #1a1d21; --muted: #6b7280; --line: #e5e7eb; --accent: #2563eb; --news: #0f766e; --disc: #b45309; }
   * { box-sizing: border-box; }
@@ -45,7 +46,8 @@
   .item a:hover { color: var(--accent); }
   .item p { margin: 0; font-size: 13px; color: var(--muted); }
   #chart { height: 420px; margin-bottom: 12px; }
-  #chart[hidden] { display: none; }
+  #chart[hidden], #ticks[hidden] { display: none; }
+  #ticks { height: 220px; margin-bottom: 12px; }
   #live { font-size: 12px; color: var(--muted); }
   .empty { color: var(--muted); padding: 24px; text-align: center; }
 </style>
@@ -66,6 +68,7 @@
   <section>
     <h2 id="feedTitle">전체 피드</h2>
     <div id="chart" hidden></div>
+    <div id="ticks" hidden></div>
     <div id="feed"></div>
   </section>
 </main>
@@ -125,6 +128,42 @@
     });
     box.append(el('div', { className: 'tradingview-widget-container' }, widget, script));
     box.firstChild.style.height = '100%';
+  }
+
+  // 틱 차트: 토스 체결 하나당 점 하나. 가로축은 시간이 아니라 체결 순번이라 한산할 때도 촘촘하다
+  // 전일 종가 위는 빨강, 아래는 파랑
+  let tick = null; // { code, series, times: [] }
+
+  async function loadTicks() {
+    const code = selected?.stockCode ?? null;
+    if (code === (tick?.code ?? null)) return;
+    tick?.chart.remove();
+    tick = null;
+    const box = document.getElementById('ticks');
+    box.hidden = !code;
+    if (!code) return;
+    const times = [];
+    const label = i => times[i - 1] ? new Date(times[i - 1]).toLocaleTimeString('ko-KR') : '';
+    const chart = LightweightCharts.createChart(box, { autoSize: true,
+      timeScale: { tickMarkFormatter: label }, localization: { timeFormatter: label } });
+    const series = chart.addBaselineSeries({
+      topLineColor: '#dc2626', topFillColor1: 'rgba(220,38,38,0.2)', topFillColor2: 'rgba(220,38,38,0.02)',
+      bottomLineColor: '#2563eb', bottomFillColor1: 'rgba(37,99,235,0.02)', bottomFillColor2: 'rgba(37,99,235,0.2)' });
+    const t = { code, chart, series, times };
+    tick = t;
+    const recent = await fetch('/api/ticks?symbol=' + encodeURIComponent(code)).then(r => r.json());
+    if (tick !== t) return; // 그 사이 다른 종목을 눌렀음
+    recent.forEach(addTick);
+  }
+
+  // ponytail: 체결이 계속 쌓이기만 한다. 탭을 며칠 켜두면 무거워지니 그때 오래된 점을 잘라낼 것
+  function addTick(q) {
+    if (q.stockCode !== tick?.code) return;
+    if (!tick.times.length) {
+      tick.series.applyOptions({ baseValue: { type: 'price', price: +(q.prevClose ?? q.lastPrice) } });
+    }
+    tick.times.push(q.timestamp);
+    tick.series.update({ time: tick.times.length, value: +q.lastPrice });
   }
 
   function stockRow(s, q) {
@@ -189,7 +228,7 @@
   function select(target) { selected = target; refresh(); }
 
   async function refresh() {
-    await Promise.all([loadStocks(), loadFeed(), loadChart()]);
+    await Promise.all([loadStocks(), loadFeed(), loadChart(), loadTicks()]);
     document.getElementById('updated').textContent = new Date().toLocaleTimeString('ko-KR') + ' 갱신';
   }
 
@@ -216,6 +255,7 @@
     document.querySelectorAll('.quote').forEach(old => {
       if (old.dataset.code === q.stockCode) old.replaceWith(withCode(quoteBox(q), q.stockCode));
     });
+    addTick(q);
   });
   stream.addEventListener('move', () => loadFeed());
 

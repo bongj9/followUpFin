@@ -44,6 +44,7 @@ class TossStream {
     private final QuoteService quoteService;
     private final PriceMoveDetector detector;
     private final LiveBroadcaster broadcaster;
+    private final TickBuffer ticks;
     private final FollowedStockRepository stockRepository;
     private final JsonMapper json = JsonMapper.builder().build();
     private final HttpClient http = HttpClient.newHttpClient();
@@ -54,11 +55,12 @@ class TossStream {
     private Instant nextAttempt = Instant.EPOCH;
 
     TossStream(TossClient toss, QuoteService quoteService, PriceMoveDetector detector,
-               LiveBroadcaster broadcaster, FollowedStockRepository stockRepository) {
+               LiveBroadcaster broadcaster, TickBuffer ticks, FollowedStockRepository stockRepository) {
         this.toss = toss;
         this.quoteService = quoteService;
         this.detector = detector;
         this.broadcaster = broadcaster;
+        this.ticks = ticks;
         this.stockRepository = stockRepository;
     }
 
@@ -143,6 +145,7 @@ class TossStream {
         JsonNode data = frame.path("data");
         Quote quote = quoteService.toQuote(symbol, new BigDecimal(data.path("price").asString()),
                 data.path("currency").asString(), data.path("timestamp").asString());
+        ticks.add(quote);
         broadcaster.send("trade", quote);
         detector.check(quote).ifPresent(move -> {
             log.info("큰 변동 감지 [{}]: {}%", move.getStockCode(), move.getChangeRate());
