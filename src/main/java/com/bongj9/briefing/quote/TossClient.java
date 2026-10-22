@@ -50,26 +50,23 @@ public class TossClient {
 
     // 일봉. 최신 봉부터 온다고 문서에 있지만 정렬은 호출하는 쪽에서 다시 한다
     public List<Candle> dailyCandles(String symbol, int count) {
-        return candles(symbol, "1d", count);
+        return candles(symbol, "1d", count, null).candles();
     }
 
-    // 1분봉 (최대 200개)
-    public List<Candle> minuteCandles(String symbol, int count) {
-        return candles(symbol, "1m", count);
-    }
-
-    private List<Candle> candles(String symbol, String interval, int count) {
+    // interval은 1m·1d만 지원. before(포함)를 주면 그 시각부터 과거로, 다음 페이지는 nextBefore로 이어 받는다
+    // 시각은 봉이 끝나는 시각 (21:50~21:51 1분봉 = 21:51)
+    public CandlePage candles(String symbol, String interval, int count, String before) {
         return call(token -> restClient.get()
                 .uri(u -> u.path("/api/v1/candles")
                         .queryParam("symbol", symbol)
                         .queryParam("interval", interval)
                         .queryParam("count", count)
+                        .queryParamIfPresent("before", java.util.Optional.ofNullable(before))
                         .build())
                 .header("Authorization", "Bearer " + token)
                 .retrieve()
                 .body(CandlesResponse.class)
-                .result()
-                .candles());
+                .result());
     }
 
     // 다른 곳(curl 테스트 등)에서 토큰을 새로 받으면 기존 토큰이 무효가 되므로 401이면 한 번 재발급 후 재시도
@@ -120,7 +117,7 @@ public class TossClient {
     record CandlesResponse(CandlePage result) {
     }
 
-    record CandlePage(List<Candle> candles) {
+    public record CandlePage(List<Candle> candles, String nextBefore) {
     }
 
     public record Candle(String timestamp, String openPrice, String highPrice, String lowPrice, String closePrice,

@@ -45,9 +45,12 @@
   .item a { display: block; color: var(--text); text-decoration: none; font-weight: 600; margin: 4px 0; }
   .item a:hover { color: var(--accent); }
   .item p { margin: 0; font-size: 13px; color: var(--muted); }
-  #chart { height: 360px; margin-bottom: 12px; }
-  #chart[hidden], #ticks[hidden] { display: none; }
-  #ticks { height: 220px; margin-bottom: 12px; }
+  #chartBox { margin-bottom: 12px; }
+  #chartBox[hidden] { display: none; }
+  #chart { height: 380px; }
+  #intervals { display: flex; gap: 4px; margin-bottom: 6px; }
+  #intervals button { border: 1px solid var(--line); background: var(--card); border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; color: var(--muted); }
+  #intervals button.active { background: var(--text); border-color: var(--text); color: #fff; }
   #live { font-size: 12px; color: var(--muted); }
   .empty { color: var(--muted); padding: 24px; text-align: center; }
 </style>
@@ -67,8 +70,7 @@
   </aside>
   <section>
     <h2 id="feedTitle">전체 피드</h2>
-    <div id="chart" hidden></div>
-    <div id="ticks" hidden></div>
+    <div id="chartBox" hidden><div id="intervals"></div><div id="chart"></div></div>
     <div id="feed"></div>
   </section>
 </main>
@@ -105,75 +107,78 @@
 
   function withCode(box, code) { box.dataset.code = code; return box; }
 
-  // 1분봉 캔들 차트 (토스 시세). 차트 라이브러리는 UTC로 그리므로 9시간을 더해 한국 시간으로 보이게 한다
+  // 차트 (토스 시세). 틱은 체결 하나당 점 하나, 나머지는 캔들. 상승 빨강·하락 파랑
+  // 차트 라이브러리는 UTC로 그리므로 시각은 한국 시간으로 옮겨서 넣는다 (캔들은 서버가 이미 옮겨서 줌)
   const KST = 9 * 3600;
   const UP = '#dc2626', DOWN = '#2563eb';
-  let chart = null, candles = null, chartCode = null, lastBar = null;
+  const INTERVALS = [['tick', '틱'], ['1m', '1분'], ['5m', '5분'], ['15m', '15분'], ['30m', '30분'], ['1h', '1시간'], ['1d', '일']];
+  const BUCKET = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600 };
+  let interval = '1m';
+  let view = null; // { code, interval, chart, series, lastBar, times }
+
+  function renderIntervals() {
+    document.getElementById('intervals').replaceChildren(...INTERVALS.map(([key, label]) =>
+      el('button', { textContent: label, className: key === interval ? 'active' : '',
+        onclick: () => { interval = key; loadChart(); } })));
+  }
 
   async function loadChart() {
     const code = selected?.stockCode ?? null;
-    const box = document.getElementById('chart');
-    box.hidden = !code;
-    if (code === chartCode) return;
-    chartCode = code; lastBar = null;
-    chart?.remove(); chart = candles = null;
+    document.getElementById('chartBox').hidden = !code;
+    if (code === view?.code && interval === view?.interval) return;
+    view?.chart.remove();
+    view = null;
     if (!code) return;
-    chart = LightweightCharts.createChart(box, { autoSize: true, timeScale: { timeVisible: true } });
-    candles = chart.addCandlestickSeries({ upColor: UP, downColor: DOWN, borderVisible: false,
-      wickUpColor: UP, wickDownColor: DOWN });
-    const res = await fetch('/api/candles?symbol=' + encodeURIComponent(code));
-    if (!res.ok || chartCode !== code) return;
-    const bars = (await res.json()).map(b => ({ time: b.time + KST, open: +b.open, high: +b.high, low: +b.low, close: +b.close }));
-    candles.setData(bars);
-    lastBar = bars.at(-1) ?? null;
-  }
-
-  // 체결 한 건으로 현재 분봉을 갱신하거나 새 분봉을 연다
-  function onTradeChart(q) {
-    if (q.stockCode !== chartCode || !lastBar) return;
-    const price = +q.lastPrice;
-    const time = Math.floor(Date.parse(q.timestamp) / 60000) * 60 + KST;
-    if (time < lastBar.time) return; // 늦게 도착한 체결
-    lastBar = time === lastBar.time
-      ? { ...lastBar, high: Math.max(lastBar.high, price), low: Math.min(lastBar.low, price), close: price }
-      : { time, open: price, high: price, low: price, close: price };
-    candles.update(lastBar);
-  }
-
-  // 틱 차트: 토스 체결 하나당 점 하나. 가로축은 시간이 아니라 체결 순번이라 한산할 때도 촘촘하다
-  // 전일 종가 위는 빨강, 아래는 파랑
-  let tick = null; // { code, series, times: [] }
-
-  async function loadTicks() {
-    const code = selected?.stockCode ?? null;
-    if (code === (tick?.code ?? null)) return;
-    tick?.chart.remove();
-    tick = null;
-    const box = document.getElementById('ticks');
-    box.hidden = !code;
-    if (!code) return;
+    renderIntervals();
+    const tick = interval === 'tick';
     const times = [];
-    const label = i => times[i - 1] ? new Date(times[i - 1]).toLocaleTimeString('ko-KR') : '';
-    const chart = LightweightCharts.createChart(box, { autoSize: true,
-      timeScale: { tickMarkFormatter: label }, localization: { timeFormatter: label } });
-    const series = chart.addBaselineSeries({
-      topLineColor: '#dc2626', topFillColor1: 'rgba(220,38,38,0.2)', topFillColor2: 'rgba(220,38,38,0.02)',
-      bottomLineColor: '#2563eb', bottomFillColor1: 'rgba(37,99,235,0.02)', bottomFillColor2: 'rgba(37,99,235,0.2)' });
-    const t = { code, chart, series, times };
-    tick = t;
-    const recent = await fetch('/api/ticks?symbol=' + encodeURIComponent(code)).then(r => r.json());
-    if (tick !== t) return; // 그 사이 다른 종목을 눌렀음
-    recent.forEach(addTick);
+    const tickLabel = i => times[i - 1] ? new Date(times[i - 1]).toLocaleTimeString('ko-KR') : '';
+    const chart = LightweightCharts.createChart(document.getElementById('chart'), {
+      autoSize: true,
+      timeScale: tick ? { tickMarkFormatter: tickLabel } : { timeVisible: interval !== '1d' },
+      localization: tick ? { timeFormatter: tickLabel } : {},
+    });
+    const series = tick
+      ? chart.addBaselineSeries({
+          topLineColor: UP, topFillColor1: 'rgba(220,38,38,0.2)', topFillColor2: 'rgba(220,38,38,0.02)',
+          bottomLineColor: DOWN, bottomFillColor1: 'rgba(37,99,235,0.02)', bottomFillColor2: 'rgba(37,99,235,0.2)' })
+      : chart.addCandlestickSeries({ upColor: UP, downColor: DOWN, borderVisible: false, wickUpColor: UP, wickDownColor: DOWN });
+    const v = { code, interval, chart, series, times, lastBar: null };
+    view = v;
+    if (tick) {
+      const recent = await fetch('/api/ticks?symbol=' + encodeURIComponent(code)).then(r => r.json());
+      if (view === v) recent.forEach(onTradeChart);
+      return;
+    }
+    const res = await fetch('/api/candles?symbol=' + encodeURIComponent(code) + '&interval=' + interval);
+    if (!res.ok || view !== v) return;
+    const bars = (await res.json()).map(b => ({ time: b.time, open: +b.open, high: +b.high, low: +b.low, close: +b.close }));
+    series.setData(bars);
+    v.lastBar = bars.at(-1) ?? null;
   }
 
-  // ponytail: 체결이 계속 쌓이기만 한다. 탭을 며칠 켜두면 무거워지니 그때 오래된 점을 잘라낼 것
-  function addTick(q) {
-    if (q.stockCode !== tick?.code) return;
-    if (!tick.times.length) {
-      tick.series.applyOptions({ baseValue: { type: 'price', price: +(q.prevClose ?? q.lastPrice) } });
+  // 체결 한 건 반영: 틱은 점 추가, 캔들은 현재 봉 갱신 또는 새 봉
+  // ponytail: 틱 점은 계속 쌓이기만 한다. 탭을 오래 켜두면 무거워지니 그때 오래된 점을 잘라낼 것
+  function onTradeChart(q) {
+    const v = view;
+    if (!v || q.stockCode !== v.code) return;
+    const price = +q.lastPrice;
+    if (v.interval === 'tick') {
+      if (!v.times.length) v.series.applyOptions({ baseValue: { type: 'price', price: +(q.prevClose ?? q.lastPrice) } });
+      v.times.push(q.timestamp);
+      v.series.update({ time: v.times.length, value: price });
+      return;
     }
-    tick.times.push(q.timestamp);
-    tick.series.update({ time: tick.times.length, value: +q.lastPrice });
+    if (!v.lastBar) return;
+    const t = Math.floor(Date.parse(q.timestamp) / 1000) + KST;
+    const size = BUCKET[v.interval];
+    // 일봉은 토스 거래일 경계가 자정이 아니라 새 봉을 열지 않고 마지막 봉만 갱신
+    const time = size ? t - t % size : v.lastBar.time;
+    if (time < v.lastBar.time) return; // 늦게 도착한 체결
+    v.lastBar = time === v.lastBar.time
+      ? { ...v.lastBar, high: Math.max(v.lastBar.high, price), low: Math.min(v.lastBar.low, price), close: price }
+      : { time, open: price, high: price, low: price, close: price };
+    v.series.update(v.lastBar);
   }
 
   function stockRow(s, q) {
@@ -238,7 +243,7 @@
   function select(target) { selected = target; refresh(); }
 
   async function refresh() {
-    await Promise.all([loadStocks(), loadFeed(), loadChart(), loadTicks()]);
+    await Promise.all([loadStocks(), loadFeed(), loadChart()]);
     document.getElementById('updated').textContent = new Date().toLocaleTimeString('ko-KR') + ' 갱신';
   }
 
@@ -265,7 +270,6 @@
     document.querySelectorAll('.quote').forEach(old => {
       if (old.dataset.code === q.stockCode) old.replaceWith(withCode(quoteBox(q), q.stockCode));
     });
-    addTick(q);
     onTradeChart(q);
   });
   stream.addEventListener('move', () => loadFeed());
