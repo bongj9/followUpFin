@@ -144,7 +144,8 @@ class TossStream {
         String symbol = topic.substring(topic.lastIndexOf(':') + 1);
         JsonNode data = frame.path("data");
         Quote quote = quoteService.toQuote(symbol, new BigDecimal(data.path("price").asString()),
-                data.path("currency").asString(), data.path("timestamp").asString());
+                data.path("currency").asString(), data.path("timestamp").asString(),
+                new BigDecimal(data.path("volume").asString("0")));
         ticks.add(quote);
         broadcaster.send("trade", quote);
         detector.check(quote).ifPresent(move -> {

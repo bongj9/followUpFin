@@ -45,6 +45,6 @@ class PriceMoveDetectorTest {
 
     private Quote quote(String code, String rate, boolean bigMove) {
         return new Quote(code, new BigDecimal("100"), new BigDecimal("100"), BigDecimal.ZERO,
-                new BigDecimal(rate), "USD", null, bigMove);
+                new BigDecimal(rate), "USD", null, bigMove, null);
     }
 }

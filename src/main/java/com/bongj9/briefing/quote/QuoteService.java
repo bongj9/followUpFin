@@ -46,17 +46,17 @@ public class QuoteService {
                 .filter(prices::containsKey)
                 .map(code -> {
                     TossClient.Price p = prices.get(code);
-                    return toQuote(p.symbol(), new BigDecimal(p.lastPrice()), p.currency(), p.timestamp());
+                    return toQuote(p.symbol(), new BigDecimal(p.lastPrice()), p.currency(), p.timestamp(), null);
                 })
                 .toList();
     }
 
     // 웹소켓 체결 한 건을 시세로 변환
-    public Quote toQuote(String symbol, BigDecimal last, String currency, String timestamp) {
+    public Quote toQuote(String symbol, BigDecimal last, String currency, String timestamp, BigDecimal volume) {
         BigDecimal prevClose = prevClose(symbol);
         BigDecimal rate = Quote.changeRate(last, prevClose);
         return new Quote(symbol, last, prevClose, Quote.change(last, prevClose), rate, currency, timestamp,
-                Quote.isBigMove(rate, bigMovePercent));
+                Quote.isBigMove(rate, bigMovePercent), volume);
     }
 
     private BigDecimal prevClose(String symbol) {

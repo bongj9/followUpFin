@@ -22,8 +22,8 @@ class QuoteServiceTest {
                 new TossClient.Candle("2026-10-21T09:00:00+09:00", "1", "1", "1", "100", "1")));
         QuoteService service = new QuoteService(toss, mock(FollowedStockRepository.class), new BigDecimal("5"));
 
-        Quote first = service.toQuote("AMD", new BigDecimal("105"), "USD", null);
-        Quote second = service.toQuote("AMD", new BigDecimal("94"), "USD", null);
+        Quote first = service.toQuote("AMD", new BigDecimal("105"), "USD", null, null);
+        Quote second = service.toQuote("AMD", new BigDecimal("94"), "USD", null, null);
 
         assertThat(first.changeRate()).isEqualByComparingTo("5.00");
         assertThat(first.bigMove()).isTrue();

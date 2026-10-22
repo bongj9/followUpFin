@@ -47,7 +47,10 @@
   .item p { margin: 0; font-size: 13px; color: var(--muted); }
   #chartBox { margin-bottom: 12px; }
   #chartBox[hidden] { display: none; }
-  #chart { height: 380px; }
+  #chartWrap { position: relative; height: 400px; }
+  #chart { height: 100%; }
+  #legend { position: absolute; top: 4px; left: 6px; z-index: 3; pointer-events: none; font-size: 12px; display: flex; flex-wrap: wrap; gap: 4px 10px; background: rgba(255,255,255,0.8); padding: 2px 4px; border-radius: 4px; }
+  #legend .up { color: #dc2626; } #legend .down { color: #2563eb; }
   #intervals { display: flex; gap: 4px; margin-bottom: 6px; }
   #intervals button { border: 1px solid var(--line); background: var(--card); border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; color: var(--muted); }
   #intervals button.active { background: var(--text); border-color: var(--text); color: #fff; }
@@ -70,7 +73,7 @@
   </aside>
   <section>
     <h2 id="feedTitle">전체 피드</h2>
-    <div id="chartBox" hidden><div id="intervals"></div><div id="chart"></div></div>
+    <div id="chartBox" hidden><div id="intervals"></div><div id="chartWrap"><div id="legend"></div><div id="chart"></div></div></div>
     <div id="feed"></div>
   </section>
 </main>
@@ -107,19 +110,42 @@
 
   function withCode(box, code) { box.dataset.code = code; return box; }
 
-  // 차트 (토스 시세). 틱은 체결 하나당 점 하나, 나머지는 캔들. 상승 빨강·하락 파랑
+  // 차트 (토스 시세, TradingView 오픈소스 Lightweight Charts). 상승 빨강·하락 파랑
+  // 틱: 체결 하나당 점 하나. 캔들: 거래량 막대 + 이동평균선 5·20·60·120 + 마우스 위치의 시고저종 표시
   // 차트 라이브러리는 UTC로 그리므로 시각은 한국 시간으로 옮겨서 넣는다 (캔들은 서버가 이미 옮겨서 줌)
   const KST = 9 * 3600;
   const UP = '#dc2626', DOWN = '#2563eb';
   const INTERVALS = [['tick', '틱'], ['1m', '1분'], ['5m', '5분'], ['15m', '15분'], ['30m', '30분'], ['1h', '1시간'], ['1d', '일']];
   const BUCKET = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600 };
+  const MAS = [[5, '#16a34a'], [20, '#f59e0b'], [60, '#8b5cf6'], [120, '#9ca3af']];
   let interval = '1m';
-  let view = null; // { code, interval, chart, series, lastBar, times }
+  let view = null; // { code, interval, chart, series, volume, mas, bars, times }
+
+  const avg = list => list.reduce((sum, b) => sum + b.close, 0) / list.length;
+  const sma = (bars, n) => bars.slice(n - 1).map((b, i) => ({ time: b.time, value: avg(bars.slice(i, i + n)) }));
+  const volumeBar = b => ({ time: b.time, value: b.volume, color: b.close >= b.open ? 'rgba(220,38,38,0.35)' : 'rgba(37,99,235,0.35)' });
+  const fmt = n => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
   function renderIntervals() {
     document.getElementById('intervals').replaceChildren(...INTERVALS.map(([key, label]) =>
       el('button', { textContent: label, className: key === interval ? 'active' : '',
         onclick: () => { interval = key; loadChart(); } })));
+  }
+
+  function showLegend(v, bar) {
+    const box = document.getElementById('legend');
+    if (!bar) { box.replaceChildren(); return; }
+    const i = v.bars.indexOf(bar);
+    const dir = bar.close >= bar.open ? 'up' : 'down';
+    box.replaceChildren(
+      ...[['시', bar.open], ['고', bar.high], ['저', bar.low], ['종', bar.close]].map(([k, val]) =>
+        el('span', {}, k + ' ', el('b', { className: dir, textContent: fmt(val) }))),
+      el('span', { textContent: '거래량 ' + bar.volume.toLocaleString('en-US') }),
+      ...MAS.filter(([n]) => i >= n - 1).map(([n, color]) => {
+        const e = el('span', { textContent: 'MA' + n + ' ' + fmt(avg(v.bars.slice(i - n + 1, i + 1))) });
+        e.style.color = color;
+        return e;
+      }));
   }
 
   async function loadChart() {
@@ -128,6 +154,7 @@
     if (code === view?.code && interval === view?.interval) return;
     view?.chart.remove();
     view = null;
+    showLegend(null);
     if (!code) return;
     renderIntervals();
     const tick = interval === 'tick';
@@ -135,29 +162,39 @@
     const tickLabel = i => times[i - 1] ? new Date(times[i - 1]).toLocaleTimeString('ko-KR') : '';
     const chart = LightweightCharts.createChart(document.getElementById('chart'), {
       autoSize: true,
+      layout: { fontSize: 11 },
+      grid: { vertLines: { color: '#f1f3f5' }, horzLines: { color: '#f1f3f5' } },
+      crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
       timeScale: tick ? { tickMarkFormatter: tickLabel } : { timeVisible: interval !== '1d' },
       localization: tick ? { timeFormatter: tickLabel } : {},
     });
-    const series = tick
-      ? chart.addBaselineSeries({
-          topLineColor: UP, topFillColor1: 'rgba(220,38,38,0.2)', topFillColor2: 'rgba(220,38,38,0.02)',
-          bottomLineColor: DOWN, bottomFillColor1: 'rgba(37,99,235,0.02)', bottomFillColor2: 'rgba(37,99,235,0.2)' })
-      : chart.addCandlestickSeries({ upColor: UP, downColor: DOWN, borderVisible: false, wickUpColor: UP, wickDownColor: DOWN });
-    const v = { code, interval, chart, series, times, lastBar: null };
-    view = v;
     if (tick) {
+      const series = chart.addBaselineSeries({
+        topLineColor: UP, topFillColor1: 'rgba(220,38,38,0.2)', topFillColor2: 'rgba(220,38,38,0.02)',
+        bottomLineColor: DOWN, bottomFillColor1: 'rgba(37,99,235,0.02)', bottomFillColor2: 'rgba(37,99,235,0.2)' });
+      const v = view = { code, interval, chart, series, times };
       const recent = await fetch('/api/ticks?symbol=' + encodeURIComponent(code)).then(r => r.json());
       if (view === v) recent.forEach(onTradeChart);
       return;
     }
+    const series = chart.addCandlestickSeries({ upColor: UP, downColor: DOWN, borderVisible: false, wickUpColor: UP, wickDownColor: DOWN });
+    series.priceScale().applyOptions({ scaleMargins: { top: 0.1, bottom: 0.25 } });
+    const volume = chart.addHistogramSeries({ priceScaleId: 'volume', priceFormat: { type: 'volume' }, lastValueVisible: false, priceLineVisible: false });
+    chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+    const mas = MAS.map(([n, color]) => ({ n, series: chart.addLineSeries({ color, lineWidth: 1,
+      priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }) }));
+    const v = view = { code, interval, chart, series, volume, mas, bars: [] };
+    chart.subscribeCrosshairMove(p => showLegend(v, (p.time && v.bars.find(b => b.time === p.time)) || v.bars.at(-1)));
     const res = await fetch('/api/candles?symbol=' + encodeURIComponent(code) + '&interval=' + interval);
     if (!res.ok || view !== v) return;
-    const bars = (await res.json()).map(b => ({ time: b.time, open: +b.open, high: +b.high, low: +b.low, close: +b.close }));
-    series.setData(bars);
-    v.lastBar = bars.at(-1) ?? null;
+    v.bars = (await res.json()).map(b => ({ time: b.time, open: +b.open, high: +b.high, low: +b.low, close: +b.close, volume: +b.volume }));
+    series.setData(v.bars);
+    volume.setData(v.bars.map(volumeBar));
+    mas.forEach(m => m.series.setData(sma(v.bars, m.n)));
+    showLegend(v, v.bars.at(-1));
   }
 
-  // 체결 한 건 반영: 틱은 점 추가, 캔들은 현재 봉 갱신 또는 새 봉
+  // 체결 한 건 반영: 틱은 점 추가, 캔들은 현재 봉(거래량·이동평균 포함) 갱신 또는 새 봉
   // ponytail: 틱 점은 계속 쌓이기만 한다. 탭을 오래 켜두면 무거워지니 그때 오래된 점을 잘라낼 것
   function onTradeChart(q) {
     const v = view;
@@ -169,16 +206,22 @@
       v.series.update({ time: v.times.length, value: price });
       return;
     }
-    if (!v.lastBar) return;
+    const last = v.bars.at(-1);
+    if (!last) return;
     const t = Math.floor(Date.parse(q.timestamp) / 1000) + KST;
     const size = BUCKET[v.interval];
     // 일봉은 토스 거래일 경계가 자정이 아니라 새 봉을 열지 않고 마지막 봉만 갱신
-    const time = size ? t - t % size : v.lastBar.time;
-    if (time < v.lastBar.time) return; // 늦게 도착한 체결
-    v.lastBar = time === v.lastBar.time
-      ? { ...v.lastBar, high: Math.max(v.lastBar.high, price), low: Math.min(v.lastBar.low, price), close: price }
-      : { time, open: price, high: price, low: price, close: price };
-    v.series.update(v.lastBar);
+    const time = size ? t - t % size : last.time;
+    if (time < last.time) return; // 늦게 도착한 체결
+    const qty = +(q.volume ?? 0);
+    const bar = time === last.time
+      ? { ...last, high: Math.max(last.high, price), low: Math.min(last.low, price), close: price, volume: last.volume + qty }
+      : { time, open: price, high: price, low: price, close: price, volume: qty };
+    if (time === last.time) v.bars[v.bars.length - 1] = bar; else v.bars.push(bar);
+    v.series.update(bar);
+    v.volume.update(volumeBar(bar));
+    v.mas.forEach(m => v.bars.length >= m.n && m.series.update({ time, value: avg(v.bars.slice(-m.n)) }));
+    showLegend(v, bar);
   }
 
   function stockRow(s, q) {

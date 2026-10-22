@@ -83,16 +83,17 @@ class LiveController {
                 .map(c -> bar(OffsetDateTime.parse(c.timestamp()).toEpochSecond() - 60 + KST_SECONDS, c)) // 끝 시각 → 시작 시각
                 .sorted(Comparator.comparingLong(Bar::time))
                 .forEach(b -> buckets.merge(b.time() - Math.floorMod(b.time(), size),
-                        new Bar(b.time() - Math.floorMod(b.time(), size), b.open(), b.high(), b.low(), b.close()),
-                        (a, n) -> new Bar(a.time(), a.open(), a.high().max(n.high()), a.low().min(n.low()), n.close())));
+                        new Bar(b.time() - Math.floorMod(b.time(), size), b.open(), b.high(), b.low(), b.close(), b.volume()),
+                        (a, n) -> new Bar(a.time(), a.open(), a.high().max(n.high()), a.low().min(n.low()), n.close(),
+                                a.volume().add(n.volume()))));
         return List.copyOf(buckets.values());
     }
 
     private static Bar bar(long time, TossClient.Candle c) {
         return new Bar(time, new BigDecimal(c.openPrice()), new BigDecimal(c.highPrice()),
-                new BigDecimal(c.lowPrice()), new BigDecimal(c.closePrice()));
+                new BigDecimal(c.lowPrice()), new BigDecimal(c.closePrice()), new BigDecimal(c.volume()));
     }
 
-    record Bar(long time, BigDecimal open, BigDecimal high, BigDecimal low, BigDecimal close) {
+    record Bar(long time, BigDecimal open, BigDecimal high, BigDecimal low, BigDecimal close, BigDecimal volume) {
     }
 }
