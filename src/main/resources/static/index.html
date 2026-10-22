@@ -45,7 +45,7 @@
   .item a { display: block; color: var(--text); text-decoration: none; font-weight: 600; margin: 4px 0; }
   .item a:hover { color: var(--accent); }
   .item p { margin: 0; font-size: 13px; color: var(--muted); }
-  #chart { height: 420px; margin-bottom: 12px; }
+  #chart { height: 360px; margin-bottom: 12px; }
   #chart[hidden], #ticks[hidden] { display: none; }
   #ticks { height: 220px; margin-bottom: 12px; }
   #live { font-size: 12px; color: var(--muted); }
@@ -105,29 +105,39 @@
 
   function withCode(box, code) { box.dataset.code = code; return box; }
 
-  // 차트는 TradingView 위젯 (TradingView 자체 시세로 실시간 갱신). 국내 종목은 KRX: 접두어
-  let chartCode = null;
+  // 1분봉 캔들 차트 (토스 시세). 차트 라이브러리는 UTC로 그리므로 9시간을 더해 한국 시간으로 보이게 한다
+  const KST = 9 * 3600;
+  const UP = '#dc2626', DOWN = '#2563eb';
+  let chart = null, candles = null, chartCode = null, lastBar = null;
 
-  function loadChart() {
+  async function loadChart() {
     const code = selected?.stockCode ?? null;
     const box = document.getElementById('chart');
     box.hidden = !code;
     if (code === chartCode) return;
-    chartCode = code;
-    box.replaceChildren();
+    chartCode = code; lastBar = null;
+    chart?.remove(); chart = candles = null;
     if (!code) return;
-    const widget = el('div', { className: 'tradingview-widget-container__widget' });
-    widget.style.height = '100%';
-    const script = el('script', {
-      src: 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js', async: true,
-      textContent: JSON.stringify({
-        symbol: /^\d{6}$/.test(code) ? 'KRX:' + code : code,
-        interval: '1', timezone: 'Asia/Seoul', locale: 'kr', theme: 'light', style: '1',
-        autosize: true, allow_symbol_change: false, hide_side_toolbar: true,
-      }),
-    });
-    box.append(el('div', { className: 'tradingview-widget-container' }, widget, script));
-    box.firstChild.style.height = '100%';
+    chart = LightweightCharts.createChart(box, { autoSize: true, timeScale: { timeVisible: true } });
+    candles = chart.addCandlestickSeries({ upColor: UP, downColor: DOWN, borderVisible: false,
+      wickUpColor: UP, wickDownColor: DOWN });
+    const res = await fetch('/api/candles?symbol=' + encodeURIComponent(code));
+    if (!res.ok || chartCode !== code) return;
+    const bars = (await res.json()).map(b => ({ time: b.time + KST, open: +b.open, high: +b.high, low: +b.low, close: +b.close }));
+    candles.setData(bars);
+    lastBar = bars.at(-1) ?? null;
+  }
+
+  // 체결 한 건으로 현재 분봉을 갱신하거나 새 분봉을 연다
+  function onTradeChart(q) {
+    if (q.stockCode !== chartCode || !lastBar) return;
+    const price = +q.lastPrice;
+    const time = Math.floor(Date.parse(q.timestamp) / 60000) * 60 + KST;
+    if (time < lastBar.time) return; // 늦게 도착한 체결
+    lastBar = time === lastBar.time
+      ? { ...lastBar, high: Math.max(lastBar.high, price), low: Math.min(lastBar.low, price), close: price }
+      : { time, open: price, high: price, low: price, close: price };
+    candles.update(lastBar);
   }
 
   // 틱 차트: 토스 체결 하나당 점 하나. 가로축은 시간이 아니라 체결 순번이라 한산할 때도 촘촘하다
@@ -256,6 +266,7 @@
       if (old.dataset.code === q.stockCode) old.replaceWith(withCode(quoteBox(q), q.stockCode));
     });
     addTick(q);
+    onTradeChart(q);
   });
   stream.addEventListener('move', () => loadFeed());
 

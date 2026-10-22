@@ -53,6 +53,11 @@ public class TossClient {
         return candles(symbol, "1d", count);
     }
 
+    // 1분봉 (최대 200개)
+    public List<Candle> minuteCandles(String symbol, int count) {
+        return candles(symbol, "1m", count);
+    }
+
     private List<Candle> candles(String symbol, String interval, int count) {
         return call(token -> restClient.get()
                 .uri(u -> u.path("/api/v1/candles")
