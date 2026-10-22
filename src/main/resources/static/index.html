@@ -11,7 +11,7 @@
   header { padding: 16px 20px; border-bottom: 1px solid var(--line); background: var(--card); display: flex; justify-content: space-between; align-items: center; }
   h1 { font-size: 18px; margin: 0; }
   #updated { color: var(--muted); font-size: 13px; }
-  main { display: grid; grid-template-columns: 260px 1fr; gap: 16px; padding: 16px 20px; max-width: 1100px; margin: 0 auto; }
+  main { display: grid; grid-template-columns: 320px 1fr; gap: 16px; padding: 16px 20px; max-width: 1100px; margin: 0 auto; }
   @media (max-width: 720px) { main { grid-template-columns: 1fr; padding: 12px 16px; } }
   aside, section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
   h2 { font-size: 14px; margin: 4px 4px 10px; color: var(--muted); }
@@ -80,7 +80,12 @@
     if (!q) return el('span');
     const rate = q.changeRate;
     const cls = rate > 0 ? 'up' : rate < 0 ? 'down' : '';
-    const rateText = rate == null ? '' : (rate > 0 ? '+' : '') + rate.toFixed(2) + '%';
+    const sign = rate > 0 ? '+' : '';
+    const usd = q.currency === 'USD';
+    const changeText = q.change == null ? '' : sign + (usd
+      ? Number(q.change).toFixed(2)
+      : Number(q.change).toLocaleString('ko-KR')) + ' ';
+    const rateText = rate == null ? '' : changeText + '(' + sign + rate.toFixed(2) + '%)';
     return el('div', { className: 'quote' + (q.bigMove ? ' big' : ''), title: '전일 종가 ' + (q.prevClose ?? '-') },
       el('div', { textContent: q.currency === 'USD'
         ? '$' + Number(q.lastPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })

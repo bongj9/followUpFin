@@ -48,7 +48,7 @@ class QuoteController {
         BigDecimal last = new BigDecimal(price.lastPrice());
         BigDecimal prevClose = prevClose(price.symbol());
         BigDecimal rate = Quote.changeRate(last, prevClose);
-        return new Quote(price.symbol(), last, prevClose, rate, price.currency(), price.timestamp(),
+        return new Quote(price.symbol(), last, prevClose, Quote.change(last, prevClose), rate, price.currency(), price.timestamp(),
                 Quote.isBigMove(rate, bigMovePercent));
     }
 

@@ -18,6 +18,13 @@ class QuoteTest {
     }
 
     @Test
+    void 전일_종가_대비_등락폭() {
+        assertThat(Quote.change(new BigDecimal("343.11"), new BigDecimal("343.99"))).isEqualByComparingTo("-0.88");
+        assertThat(Quote.change(new BigDecimal("72300"), new BigDecimal("71600"))).isEqualByComparingTo("700");
+        assertThat(Quote.change(new BigDecimal("100"), null)).isNull();
+    }
+
+    @Test
     void 전일_종가를_모르면_등락률도_없다() {
         assertThat(Quote.changeRate(new BigDecimal("100"), null)).isNull();
         assertThat(Quote.changeRate(new BigDecimal("100"), BigDecimal.ZERO)).isNull();

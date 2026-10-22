@@ -3,9 +3,13 @@ package com.bongj9.briefing.quote;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
-// changeRate: 전일 종가 대비 등락률(%), 소수 둘째 자리. 전일 종가를 모르면 null
-public record Quote(String stockCode, BigDecimal lastPrice, BigDecimal prevClose, BigDecimal changeRate,
+// change: 전일 종가 대비 등락폭, changeRate: 등락률(%) 소수 둘째 자리. 전일 종가를 모르면 둘 다 null
+public record Quote(String stockCode, BigDecimal lastPrice, BigDecimal prevClose, BigDecimal change, BigDecimal changeRate,
                     String currency, String timestamp, boolean bigMove) {
+
+    static BigDecimal change(BigDecimal last, BigDecimal prevClose) {
+        return prevClose == null ? null : last.subtract(prevClose);
+    }
 
     static BigDecimal changeRate(BigDecimal last, BigDecimal prevClose) {
         if (prevClose == null || prevClose.signum() == 0) {
