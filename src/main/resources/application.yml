@@ -18,3 +18,4 @@ spring:
 
 briefing:
   poll-interval: PT10M
+  big-move-percent: 5 # 전일 대비 이 이상 오르거나 내리면 강조
