@@ -1,15 +1,18 @@
 package com.bongj9.briefing.application;
 
 import com.bongj9.briefing.application.port.CompanyProfiles;
+import com.bongj9.briefing.application.port.MarketData;
 import com.bongj9.briefing.domain.CompanyProfile;
 import com.bongj9.briefing.domain.FollowedStock;
 import com.bongj9.briefing.domain.FollowedStockRepository;
 import com.bongj9.briefing.domain.FollowedStocksChanged;
+import com.bongj9.briefing.domain.Holding;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -20,14 +23,38 @@ public class StockService {
     private final FollowedStockRepository repository;
     private final NewsCollector newsCollector;
     private final CompanyProfiles profiles;
+    private final MarketData market;
     private final ApplicationEventPublisher events;
 
     public StockService(FollowedStockRepository repository, NewsCollector newsCollector, CompanyProfiles profiles,
-                        ApplicationEventPublisher events) {
+                        MarketData market, ApplicationEventPublisher events) {
         this.repository = repository;
         this.newsCollector = newsCollector;
         this.profiles = profiles;
+        this.market = market;
         this.events = events;
+    }
+
+    // 증권 계좌에 들고 있는 종목 중 아직 팔로우하지 않은 것을 추가한다
+    // 미국 종목은 토스 이름(한글) 대신 Finnhub 영어 이름을 쓴다: 로이터·블룸버그 기사를 제목의 회사 이름으로 찾기 때문
+    public ImportResult importHoldings() {
+        List<String> added = new ArrayList<>();
+        List<String> failed = new ArrayList<>();
+        for (Holding h : market.holdings()) {
+            if (repository.existsById(h.symbol())) {
+                continue;
+            }
+            try {
+                follow(h.symbol(), FollowedStock.isKoreanCode(h.symbol()) ? h.name() : "");
+                added.add(h.name());
+            } catch (InvalidStockException e) {
+                failed.add(h.name() + " (" + e.getMessage() + ")");
+            }
+        }
+        return new ImportResult(added, failed);
+    }
+
+    public record ImportResult(List<String> added, List<String> failed) {
     }
 
     public List<FollowedStock> list() {

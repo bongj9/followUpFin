@@ -2,6 +2,7 @@ package com.bongj9.briefing.adapter.toss;
 
 import com.bongj9.briefing.application.port.MarketData;
 import com.bongj9.briefing.domain.Candle;
+import com.bongj9.briefing.domain.Holding;
 import com.bongj9.briefing.domain.InvestorFlow;
 import com.bongj9.briefing.domain.LastPrice;
 import com.bongj9.briefing.domain.Orderbook;
@@ -174,6 +175,32 @@ public class TossClient implements MarketData {
                 .toList();
     }
 
+    // 계좌는 종합매매(BROKERAGE) 하나만 나온다. 보유 주식 API는 계좌 번호가 아니라 accountSeq를 헤더로 받는다
+    @Override
+    public List<Holding> holdings() {
+        List<TossAccount> accounts = call(token -> restClient.get()
+                .uri("/api/v1/accounts")
+                .header("Authorization", "Bearer " + token)
+                .retrieve()
+                .body(AccountsResponse.class)
+                .result());
+        if (accounts.isEmpty()) {
+            return List.of();
+        }
+        long accountSeq = accounts.getFirst().accountSeq();
+        return call(token -> restClient.get()
+                .uri("/api/v1/holdings")
+                .header("Authorization", "Bearer " + token)
+                .header("X-Tossinvest-Account", String.valueOf(accountSeq))
+                .retrieve()
+                .body(HoldingsResponse.class)
+                .result()
+                .items()).stream()
+                .map(h -> new Holding(h.symbol(), h.name(), new BigDecimal(h.quantity()),
+                        new BigDecimal(h.averagePurchasePrice()), h.currency()))
+                .toList();
+    }
+
     // 다른 곳(curl 테스트 등)에서 토큰을 새로 받으면 기존 토큰이 무효가 되므로 401이면 한 번 재발급 후 재시도
     private <T> T call(Function<String, T> request) {
         try {
@@ -217,6 +244,21 @@ public class TossClient implements MarketData {
     }
 
     record TossPrice(String symbol, String timestamp, String lastPrice, String currency) {
+    }
+
+    record AccountsResponse(List<TossAccount> result) {
+    }
+
+    record TossAccount(long accountSeq) { // 계좌번호(accountNo)는 쓰지 않아 받지 않는다
+    }
+
+    record HoldingsResponse(TossHoldings result) {
+    }
+
+    record TossHoldings(List<TossPosition> items) {
+    }
+
+    record TossPosition(String symbol, String name, String quantity, String averagePurchasePrice, String currency) {
     }
 
     record CandlesResponse(TossCandlePage result) {

@@ -140,6 +140,7 @@
       <input name="name" placeholder="이름 (선택)">
       <button>추가</button>
     </form>
+    <button id="importHoldings" class="more">토스 보유 종목 가져오기</button>
     <div id="error"></div>
   </aside>
   <div id="head"></div>
@@ -860,6 +861,21 @@
     button.disabled = false;
     document.getElementById('error').textContent = res.ok ? '' : ((await res.json()).message || '티커를 확인하세요');
     if (res.ok) { form.reset(); refresh(); }
+  };
+
+  // 토스 계좌에 들고 있는 종목을 관심종목에 한 번에 넣는다 (이미 있는 종목은 건너뜀)
+  document.getElementById('importHoldings').onclick = async ev => {
+    const button = ev.target;
+    button.disabled = true;
+    button.textContent = '가져오는 중…'; // 종목마다 첫 뉴스를 받아서 몇 초 걸린다
+    const res = await fetch('/api/stocks/import-holdings', { method: 'POST' });
+    const r = await res.json().catch(() => null);
+    button.disabled = false;
+    button.textContent = '토스 보유 종목 가져오기';
+    document.getElementById('error').textContent = !res.ok ? '가져오지 못했어요: ' + (r?.message ?? res.status)
+      : (r.added.length ? r.added.length + '개 추가: ' + r.added.join(', ') : '새로 추가할 보유 종목이 없어요')
+        + (r.failed.length ? ' · 실패: ' + r.failed.join(', ') : '');
+    refresh();
   };
 
   // 서버가 토스 실시간 체결을 SSE로 넘겨준다. 끊기면 EventSource가 알아서 다시 붙는다

@@ -1,6 +1,7 @@
 package com.bongj9.briefing.application.port;
 
 import com.bongj9.briefing.domain.Candle;
+import com.bongj9.briefing.domain.Holding;
 import com.bongj9.briefing.domain.InvestorFlow;
 import com.bongj9.briefing.domain.LastPrice;
 import com.bongj9.briefing.domain.Orderbook;
@@ -36,4 +37,7 @@ public interface MarketData {
 
     // 원/달러 매매기준율. at이 null이면 지금
     BigDecimal usdKrw(Instant at);
+
+    // 내 종합매매 계좌의 보유 주식 (국내·미국)
+    List<Holding> holdings();
 }

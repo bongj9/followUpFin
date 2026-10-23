@@ -36,6 +36,12 @@ class StockController {
         }
     }
 
+    // 토스 계좌의 보유 종목을 관심종목으로 가져온다 (이미 있는 건 건너뜀)
+    @PostMapping("/api/stocks/import-holdings")
+    StockService.ImportResult importHoldings() {
+        return stocks.importHoldings();
+    }
+
     @DeleteMapping("/api/stocks/{stockCode}")
     void unfollow(@PathVariable String stockCode) {
         stocks.unfollow(stockCode);
