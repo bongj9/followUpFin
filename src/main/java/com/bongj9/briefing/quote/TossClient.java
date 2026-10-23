@@ -69,6 +69,26 @@ public class TossClient {
                 .result());
     }
 
+    // 호가 (매도는 낮은 가격순, 매수는 높은 가격순)
+    public Orderbook orderbook(String symbol) {
+        return call(token -> restClient.get()
+                .uri(u -> u.path("/api/v1/orderbook").queryParam("symbol", symbol).build())
+                .header("Authorization", "Bearer " + token)
+                .retrieve()
+                .body(OrderbookResponse.class)
+                .result());
+    }
+
+    // 당일 최근 체결 (최대 50건, 최신순)
+    public List<Trade> trades(String symbol) {
+        return call(token -> restClient.get()
+                .uri(u -> u.path("/api/v1/trades").queryParam("symbol", symbol).queryParam("count", 50).build())
+                .header("Authorization", "Bearer " + token)
+                .retrieve()
+                .body(TradesResponse.class)
+                .result());
+    }
+
     // 다른 곳(curl 테스트 등)에서 토큰을 새로 받으면 기존 토큰이 무효가 되므로 401이면 한 번 재발급 후 재시도
     private <T> T call(Function<String, T> request) {
         try {
@@ -115,6 +135,22 @@ public class TossClient {
     }
 
     record CandlesResponse(CandlePage result) {
+    }
+
+    record OrderbookResponse(Orderbook result) {
+    }
+
+    record TradesResponse(List<Trade> result) {
+    }
+
+    // 웹소켓 호가 프레임의 data도 같은 모양이다
+    public record Orderbook(String timestamp, String currency, List<Level> asks, List<Level> bids) {
+    }
+
+    public record Level(String price, String volume) {
+    }
+
+    public record Trade(String price, String volume, String timestamp, String currency) {
     }
 
     public record CandlePage(List<Candle> candles, String nextBefore) {

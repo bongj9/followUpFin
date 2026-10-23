@@ -34,10 +34,10 @@ class LiveController {
     private static final int MAX_PAGES = 10;
 
     private final LiveBroadcaster broadcaster;
-    private final TickBuffer ticks;
+    private final TickStore ticks;
     private final TossClient toss;
 
-    LiveController(LiveBroadcaster broadcaster, TickBuffer ticks, TossClient toss) {
+    LiveController(LiveBroadcaster broadcaster, TickStore ticks, TossClient toss) {
         this.broadcaster = broadcaster;
         this.ticks = ticks;
         this.toss = toss;
@@ -49,10 +49,22 @@ class LiveController {
         return broadcaster.connect();
     }
 
-    // 틱 차트 초기 데이터: 서버가 켜진 뒤 받은 최근 체결 (최대 1000건)
+    // 틱 차트 초기 데이터: DB에 쌓인 최근 체결 (최대 1000건)
     @GetMapping("/api/ticks")
     List<Quote> ticks(@RequestParam String symbol) {
         return ticks.recent(symbol.toUpperCase());
+    }
+
+    // 호가창 초기 데이터. 이후는 SSE orderbook 이벤트로 갱신
+    @GetMapping("/api/orderbook")
+    TossClient.Orderbook orderbook(@RequestParam String symbol) {
+        return toss.orderbook(symbol.toUpperCase());
+    }
+
+    // 체결창 초기 데이터 (토스 당일 최근 50건, 최신순). 이후는 SSE trade 이벤트로 갱신
+    @GetMapping("/api/trades")
+    List<TossClient.Trade> trades(@RequestParam String symbol) {
+        return toss.trades(symbol.toUpperCase());
     }
 
     // 캔들 차트 초기 데이터 (오래된 순). time은 차트에 그대로 쓰도록 한국 시간으로 옮긴 epoch 초

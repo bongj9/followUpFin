@@ -4,6 +4,7 @@ import com.bongj9.briefing.move.PriceMoveDetector;
 import com.bongj9.briefing.quote.Quote;
 import com.bongj9.briefing.quote.QuoteService;
 import com.bongj9.briefing.quote.TossClient;
+import com.bongj9.briefing.quote.TossClient.Orderbook;
 import com.bongj9.briefing.stock.FollowedStock;
 import com.bongj9.briefing.stock.FollowedStockRepository;
 import com.bongj9.briefing.stock.FollowedStocksChanged;
@@ -44,7 +45,7 @@ class TossStream {
     private final QuoteService quoteService;
     private final PriceMoveDetector detector;
     private final LiveBroadcaster broadcaster;
-    private final TickBuffer ticks;
+    private final TickStore ticks;
     private final FollowedStockRepository stockRepository;
     private final JsonMapper json = JsonMapper.builder().build();
     private final HttpClient http = HttpClient.newHttpClient();
@@ -55,7 +56,7 @@ class TossStream {
     private Instant nextAttempt = Instant.EPOCH;
 
     TossStream(TossClient toss, QuoteService quoteService, PriceMoveDetector detector,
-               LiveBroadcaster broadcaster, TickBuffer ticks, FollowedStockRepository stockRepository) {
+               LiveBroadcaster broadcaster, TickStore ticks, FollowedStockRepository stockRepository) {
         this.toss = toss;
         this.quoteService = quoteService;
         this.detector = detector;
@@ -107,7 +108,8 @@ class TossStream {
         subscribe();
     }
 
-    // 구독은 full-replace: 보낼 때마다 이 배열이 현재 구독 전체가 된다
+    // 구독은 full-replace: 보낼 때마다 이 배열이 현재 구독 전체가 된다. 종목마다 체결 + 호가
+    // ponytail: 연결당 구독 100건 한도라 팔로우 50종목까지. 넘으면 화면에서 보고 있는 종목만 호가를 구독할 것
     private void subscribe() {
         WebSocket ws = socket;
         if (ws == null) {
@@ -117,11 +119,13 @@ class TossStream {
                 .collect(Collectors.partitioningBy(FollowedStock::isKorean,
                         Collectors.mapping(FollowedStock::getStockCode, Collectors.toList())));
         List<Map<String, Object>> declaration = new ArrayList<>();
-        if (!byMarket.get(false).isEmpty()) {
-            declaration.add(Map.of("type", "trade:us", "codes", byMarket.get(false)));
-        }
-        if (!byMarket.get(true).isEmpty()) {
-            declaration.add(Map.of("type", "trade:kr", "codes", byMarket.get(true)));
+        for (String channel : List.of("trade", "orderbook")) {
+            if (!byMarket.get(false).isEmpty()) {
+                declaration.add(Map.of("type", channel + ":us", "codes", byMarket.get(false)));
+            }
+            if (!byMarket.get(true).isEmpty()) {
+                declaration.add(Map.of("type", channel + ":kr", "codes", byMarket.get(true)));
+            }
         }
         ws.sendText(json.writeValueAsString(declaration), true);
     }
@@ -137,12 +141,16 @@ class TossStream {
     }
 
     private void onMessage(JsonNode frame) {
-        String topic = frame.path("topic").asString(); // trade:us:AAPL
+        String topic = frame.path("topic").asString(); // trade:us:AAPL, orderbook:us:AAPL
+        String symbol = topic.substring(topic.lastIndexOf(':') + 1);
+        JsonNode data = frame.path("data");
+        if (topic.startsWith("orderbook:")) {
+            broadcaster.send("orderbook", new BookEvent(symbol, json.treeToValue(data, Orderbook.class)));
+            return;
+        }
         if (!topic.startsWith("trade:")) {
             return;
         }
-        String symbol = topic.substring(topic.lastIndexOf(':') + 1);
-        JsonNode data = frame.path("data");
         Quote quote = quoteService.toQuote(symbol, new BigDecimal(data.path("price").asString()),
                 data.path("currency").asString(), data.path("timestamp").asString(),
                 new BigDecimal(data.path("volume").asString("0")));
@@ -169,6 +177,9 @@ class TossStream {
             e = e.getCause();
         }
         return e.getClass().getSimpleName() + " " + e.getMessage();
+    }
+
+    record BookEvent(String stockCode, Orderbook book) {
     }
 
     private class Listener implements WebSocket.Listener {
