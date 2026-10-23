@@ -24,6 +24,16 @@
   @media (max-width: 1100px) { main.page-stock { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "chart" "feed" "below"; } main.page-stock #feedBox { position: static; max-height: none; } }
   @media (max-width: 720px) { main { grid-template-columns: minmax(0, 1fr); grid-template-areas: "watch" "feed"; padding: 12px 16px; } header { padding: 12px 16px; gap: 8px; } #updated { display: none; } }
   .up { color: #dc2626; } .down { color: #2563eb; }
+  /* 상단 지표 띠: 같은 목록을 두 번 이어 붙이고 절반만큼 왼쪽으로 흘려서 끊김 없이 돈다. 마우스를 올리면 멈춘다 */
+  #ticker { overflow: hidden; background: var(--card); border-bottom: 1px solid var(--line); }
+  #ticker:empty { display: none; }
+  #ticker .track { display: flex; width: max-content; animation: ticker 40s linear infinite; }
+  #ticker:hover .track { animation-play-state: paused; }
+  @keyframes ticker { to { transform: translateX(-50%); } }
+  .ind { display: flex; align-items: center; gap: 8px; padding: 8px 20px; font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; border-right: 1px solid var(--line); }
+  .ind b { font-weight: 600; }
+  .ind svg { width: 60px; height: 20px; }
+  @media (prefers-reduced-motion: reduce) { #ticker { overflow-x: auto; } #ticker .track { animation: none; } #ticker .track > .copy { display: none; } }
   #head { align-items: center; gap: 12px; padding: 0 4px; }
   #head .back { border: 1px solid var(--line); background: var(--card); border-radius: 8px; width: 36px; height: 36px; font-size: 18px; cursor: pointer; color: var(--text); }
   #head .back:hover { background: var(--bg); }
@@ -115,6 +125,7 @@
 </head>
 <body>
 <header><h1>종목 브리핑</h1><span><span id="live">실시간 연결 중…</span> · <span id="updated"></span></span></header>
+<div id="ticker" aria-label="주요 지표"></div>
 <main id="main">
   <aside id="watch">
     <h2>관심 종목</h2>
@@ -658,6 +669,37 @@
       el('span', {}, s.name, el('small', { textContent: s.stockCode })), withCode(quoteBox(q), s.stockCode), del);
   }
 
+  // 상단 지표 띠. 그래프는 최근 2시간 1분봉 종가, 전일 종가보다 높으면 빨강
+  async function loadIndicators() {
+    const list = await fetch('/api/indicators').then(r => r.ok ? r.json() : []).catch(() => []);
+    const ticker = document.getElementById('ticker');
+    if (!list.length) return ticker.replaceChildren();
+    const item = i => {
+      const color = i.changeRate > 0 ? UP : i.changeRate < 0 ? DOWN : '#9ca3af';
+      return el('div', { className: 'ind' },
+        el('span', { textContent: i.label }),
+        el('b', { textContent: i.last == null ? '-' : (+i.last).toLocaleString('en-US', { maximumFractionDigits: 2 }) }),
+        el('span', { className: dirClass(i.changeRate), textContent: i.changeRate == null ? '' : (i.changeRate > 0 ? '+' : '') + (+i.changeRate).toFixed(2) + '%' }),
+        ...(i.spark.length > 1 ? [spark(i.spark.map(Number), color)] : []));
+    };
+    const copy = cls => el('div', { className: 'track-copy ' + cls, style: 'display:flex' }, ...list.map(item));
+    ticker.replaceChildren(el('div', { className: 'track' }, copy(''), copy('copy')));
+  }
+  function spark(values, color) {
+    const min = Math.min(...values), max = Math.max(...values), span = max - min || 1;
+    const points = values.map((v, i) => (i / (values.length - 1) * 60).toFixed(1) + ',' + (18 - (v - min) / span * 16).toFixed(1)).join(' ');
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 60 20');
+    svg.setAttribute('aria-hidden', 'true');
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    line.setAttribute('points', points);
+    line.setAttribute('fill', 'none');
+    line.setAttribute('stroke', color);
+    line.setAttribute('stroke-width', '1.5');
+    svg.append(line);
+    return svg;
+  }
+
   // 업종별로 묶어서 보여준다. 업종 제목을 누르면 그 업종 전체 피드
   async function loadStocks() {
     // 시세가 실패해도 종목 목록은 보여준다
@@ -763,7 +805,7 @@
     // 종목을 골랐으면 종목 페이지, 아니면 홈. 차트를 만들기 전에 바꿔야 차트가 제 크기로 그려진다
     document.getElementById('main').classList.toggle('page-stock', !!selected?.stockCode);
     renderTabs(); // 시장 탭은 홈에서만 보인다
-    await Promise.all([loadStocks(), loadFeed(), loadChart(), loadSide()]);
+    await Promise.all([loadStocks(), loadFeed(), loadChart(), loadSide(), loadIndicators()]);
     renderHead();
     renderSide(); // 전일 종가가 늦게 와도 호가 등락률을 다시 계산
     document.getElementById('updated').textContent = new Date().toLocaleTimeString('ko-KR') + ' 갱신';

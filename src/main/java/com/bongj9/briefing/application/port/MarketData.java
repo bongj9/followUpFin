@@ -6,6 +6,8 @@ import com.bongj9.briefing.domain.LastPrice;
 import com.bongj9.briefing.domain.Orderbook;
 import com.bongj9.briefing.domain.Trade;
 
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 
@@ -28,4 +30,10 @@ public interface MarketData {
 
     // 국내 종목만. 최신 날짜부터 최대 count일
     List<InvestorFlow> investorFlows(String symbol, int count);
+
+    // 시장 지표(KOSPI, KOSDAQ) 캔들. interval은 1m 또는 1d, 최대 200개
+    List<Candle> indicatorCandles(String symbol, String interval, int count);
+
+    // 원/달러 매매기준율. at이 null이면 지금
+    BigDecimal usdKrw(Instant at);
 }

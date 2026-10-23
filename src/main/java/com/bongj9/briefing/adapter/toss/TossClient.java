@@ -77,6 +77,37 @@ public class TossClient implements MarketData {
         return candles(symbol, "1d", count);
     }
 
+    // 시장 지표는 경로만 다르고 응답 모양은 종목 캔들과 같다 (한 페이지 200개까지만 받음)
+    @Override
+    public List<Candle> indicatorCandles(String symbol, String interval, int count) {
+        return call(token -> restClient.get()
+                .uri(u -> u.path("/api/v1/market-indicators/{symbol}/candles")
+                        .queryParam("interval", interval)
+                        .queryParam("count", Math.min(count, CANDLE_PAGE))
+                        .build(symbol))
+                .header("Authorization", "Bearer " + token)
+                .retrieve()
+                .body(CandlesResponse.class)
+                .result()).candles().stream()
+                .map(TossCandle::toCandleOrNull)
+                .filter(c -> c != null)
+                .toList();
+    }
+
+    @Override
+    public BigDecimal usdKrw(Instant at) {
+        return new BigDecimal(call(token -> restClient.get()
+                .uri(u -> u.path("/api/v1/exchange-rate")
+                        .queryParam("baseCurrency", "USD")
+                        .queryParam("quoteCurrency", "KRW")
+                        .queryParamIfPresent("dateTime", Optional.ofNullable(at).map(Instant::toString))
+                        .build())
+                .header("Authorization", "Bearer " + token)
+                .retrieve()
+                .body(ExchangeRateResponse.class)
+                .result()).midRate());
+    }
+
     // 토스는 interval 1m·1d만 지원하고 한 번에 200개까지. before(포함)를 주면 그 시각부터 과거로, 다음 페이지는 nextBefore로 이어 받는다
     private List<Candle> candles(String symbol, String interval, int count) {
         List<Candle> candles = new ArrayList<>();
@@ -189,6 +220,12 @@ public class TossClient implements MarketData {
     }
 
     record CandlesResponse(TossCandlePage result) {
+    }
+
+    record ExchangeRateResponse(TossRate result) {
+    }
+
+    record TossRate(String midRate) {
     }
 
     record TossCandlePage(List<TossCandle> candles, String nextBefore) {
