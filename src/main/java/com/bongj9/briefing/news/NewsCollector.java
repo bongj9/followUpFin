@@ -16,13 +16,11 @@ public class NewsCollector {
 
     private static final Logger log = LoggerFactory.getLogger(NewsCollector.class);
 
-    private final FinnhubClient finnhub;
-    private final NaverNewsClient naver;
+    private final List<NewsSource> sources; // 스프링이 NewsSource 구현 빈을 전부 넣어 준다 (Finnhub, 네이버)
     private final NewsRepository repository;
 
-    public NewsCollector(FinnhubClient finnhub, NaverNewsClient naver, NewsRepository repository) {
-        this.finnhub = finnhub;
-        this.naver = naver;
+    public NewsCollector(List<NewsSource> sources, NewsRepository repository) {
+        this.sources = sources;
         this.repository = repository;
     }
 
@@ -45,19 +43,15 @@ public class NewsCollector {
         return fresh.size();
     }
 
-    // 국내 종목은 종목명으로 네이버 검색, 미국 종목은 티커로 Finnhub
+    // 이 종목을 맡겠다는 출처를 고른다 (국내는 네이버, 미국은 Finnhub)
     private List<NewsItem> fetch(FollowedStock stock) {
-        if (stock.isKorean()) {
-            if (!naver.isConfigured()) {
-                log.warn("secret.yml에 네이버 키가 없어 [{}] 뉴스를 건너뜀", stock.getName());
-                return List.of();
-            }
-            return naver.search(stock.getName());
-        }
-        if (!finnhub.isConfigured()) {
-            log.warn("secret.yml에 Finnhub 키가 없어 [{}] 뉴스를 건너뜀", stock.getStockCode());
-            return List.of();
-        }
-        return finnhub.companyNews(stock.getStockCode());
+        return sources.stream()
+                .filter(source -> source.supports(stock))
+                .findFirst()
+                .map(source -> source.fetch(stock))
+                .orElseGet(() -> {
+                    log.warn("[{}] 뉴스 출처가 없어 건너뜀 (secret.yml 키 확인)", stock.getName());
+                    return List.of();
+                });
     }
 }

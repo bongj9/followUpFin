@@ -1,5 +1,6 @@
 package com.bongj9.briefing.news;
 
+import com.bongj9.briefing.stock.FollowedStock;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -12,7 +13,7 @@ import java.util.List;
 
 // 미국 종목 뉴스. 본문은 주지 않고 제목·요약·매체·원문 링크만 준다
 @Component
-public class FinnhubClient {
+public class FinnhubClient implements NewsSource {
 
     private static final int LOOKBACK_DAYS = 3;
 
@@ -27,6 +28,17 @@ public class FinnhubClient {
 
     public boolean isConfigured() {
         return !apiKey.isBlank();
+    }
+
+    @Override
+    public boolean supports(FollowedStock stock) {
+        return !stock.isKorean() && isConfigured();
+    }
+
+    // 미국 종목은 티커로 찾는다
+    @Override
+    public List<NewsItem> fetch(FollowedStock stock) {
+        return companyNews(stock.getStockCode());
     }
 
     public List<NewsItem> companyNews(String symbol) {

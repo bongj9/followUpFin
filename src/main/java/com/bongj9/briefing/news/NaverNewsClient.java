@@ -1,5 +1,6 @@
 package com.bongj9.briefing.news;
 
+import com.bongj9.briefing.stock.FollowedStock;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -11,7 +12,7 @@ import java.util.List;
 
 // 국내 종목 뉴스. 종목명으로 검색한다
 @Component
-public class NaverNewsClient {
+public class NaverNewsClient implements NewsSource {
 
     private final RestClient restClient;
     private final boolean configured;
@@ -28,6 +29,17 @@ public class NaverNewsClient {
 
     public boolean isConfigured() {
         return configured;
+    }
+
+    @Override
+    public boolean supports(FollowedStock stock) {
+        return stock.isKorean() && configured;
+    }
+
+    // 국내 종목은 종목명으로 검색한다
+    @Override
+    public List<NewsItem> fetch(FollowedStock stock) {
+        return search(stock.getName());
     }
 
     // 최신순 100건 (네이버 최대값)
