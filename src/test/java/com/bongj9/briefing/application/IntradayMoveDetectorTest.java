@@ -65,28 +65,28 @@ class IntradayMoveDetectorTest {
 
     @Test
     void 평소의_4배를_넘게_5분_안에_움직이면_한_번_기록하고_30분은_다시_알리지_않는다() {
-        when(market.minuteCandles(eq("AAPL"), anyInt())).thenReturn(minuteCandles(100, 0.1)); // 평소 5분 0.1% → 기준 1.5%(최소)
+        when(market.minuteCandles(eq("AAPL"), anyInt())).thenReturn(minuteCandles(100, 0.1)); // 평소 5분 0.1% → 기준 3%(최소)
         detector.refresh();
 
         assertThat(trade("100.00", 0)).isEmpty();
-        assertThat(trade("101.00", 60)).isEmpty(); // +1%: 기준 미만
-        Optional<IntradayMove> up = trade("101.60", 120); // 저점 100 대비 +1.6%
+        assertThat(trade("102.00", 60)).isEmpty(); // +2%: 기준 미만
+        Optional<IntradayMove> up = trade("103.20", 120); // 저점 100 대비 +3.2%
         assertThat(up).isPresent();
-        assertThat(up.get().getChangeRate()).isEqualByComparingTo("1.60");
+        assertThat(up.get().getChangeRate()).isEqualByComparingTo("3.20");
         assertThat(up.get().getFromPrice()).isEqualByComparingTo("100.00");
 
-        assertThat(trade("102.50", 180)).isEmpty(); // 같은 방향은 30분 동안 다시 안 알림
-        assertThat(trade("100.80", 240)).isPresent(); // 반대 방향(고점 102.5 대비 -1.66%)은 따로 알림
+        assertThat(trade("104.00", 180)).isEmpty(); // 같은 방향은 30분 동안 다시 안 알림
+        assertThat(trade("100.80", 240)).isPresent(); // 반대 방향(고점 104 대비 -3.08%)은 따로 알림
     }
 
     @Test
     void 평소에_많이_움직이는_종목은_기준이_높다() {
-        when(market.minuteCandles(eq("AAPL"), anyInt())).thenReturn(minuteCandles(100, 1.0)); // 평소 5분 1% → 기준 4%
+        when(market.minuteCandles(eq("AAPL"), anyInt())).thenReturn(minuteCandles(100, 1.5)); // 평소 5분 1.5% → 기준 6%
         detector.refresh();
 
         trade("100", 0);
-        assertThat(trade("103", 60)).isEmpty(); // 3%는 이 종목에겐 크지 않다
-        assertThat(trade("104.5", 120)).isPresent();
+        assertThat(trade("104", 60)).isEmpty(); // 4%는 이 종목에겐 크지 않다
+        assertThat(trade("106.5", 120)).isPresent();
     }
 
     @Test
@@ -95,7 +95,7 @@ class IntradayMoveDetectorTest {
         detector.refresh();
 
         trade("100", 0);
-        assertThat(trade("102", 301)).isEmpty(); // 100은 5분 넘게 지나 창에서 빠짐
+        assertThat(trade("103.5", 301)).isEmpty(); // 100은 5분 넘게 지나 창에서 빠짐
     }
 
     private Optional<IntradayMove> trade(String price, int seconds) {

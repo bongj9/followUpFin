@@ -25,7 +25,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-// 장중 급등락: 최근 5분 안의 움직임이 그 종목 평소 5분 변동의 4배를 넘으면 기록한다 (최소 1.5%)
+// 장중 급등락: 최근 5분 안에 3% 이상 움직이면 기록한다. 평소에 많이 움직이는 종목은 평소 5분 변동의 4배가 더 크면 그걸 기준으로 쓴다
+// 3%는 Webull "Sharp Rise/Fall" 알림(5분 3%)과 같은 선. 거래소 정지선(미국 LULD 5분 5%·10%, 한국 VI)보다 먼저 알린다
 // 고정 기준(예: 1분 3%)은 대형주는 거의 못 잡고 거래 적은 소형주·프리마켓은 너무 자주 잡아서 종목마다 기준을 둔다
 // 가격은 메모리에만 1초에 하나씩 5분치 들고 있는다 (체결은 저장하지 않는다)
 @Service
@@ -35,7 +36,7 @@ public class IntradayMoveDetector {
     static final Duration WINDOW = Duration.ofMinutes(5);
     static final Duration COOLDOWN = Duration.ofMinutes(30); // 같은 종목 같은 방향은 30분 동안 다시 알리지 않는다
     static final double MULTIPLE = 4;
-    static final double MIN_PERCENT = 1.5;
+    static final double MIN_PERCENT = 3;
     private static final int CANDLES = 200;
 
     private final MarketData market;
