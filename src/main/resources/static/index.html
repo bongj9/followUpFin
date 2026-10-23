@@ -554,7 +554,10 @@
     if (side !== s) return; // 그사이 다른 종목을 골랐다
     if (!book && !trades) s.error = '토스 시세를 불러올 수 없어요 (secret.yml 토스 키·허용 IP 확인)';
     s.book = s.book ?? book; // 기다리는 동안 SSE로 더 최신 호가가 왔으면 그걸 쓴다
-    s.trades = [...s.trades, ...(trades ?? [])].slice(0, 50);
+    // 기다리는 동안 SSE로 온 체결은 스냅샷에도 들어 있을 수 있어, 그보다 오래된 것만 붙인다
+    const oldestLive = s.trades.at(-1)?.timestamp;
+    const older = (trades ?? []).filter(t => !oldestLive || Date.parse(t.timestamp) < Date.parse(oldestLive));
+    s.trades = [...s.trades, ...older].slice(0, 50);
     renderSide();
   }
 
@@ -570,8 +573,8 @@
     const box = document.getElementById('book');
     if (!side.book) { box.replaceChildren(el('div', { className: 'empty', textContent: side.error || '호가를 불러오는 중…' })); return; }
     const { currency } = side.book;
-    const asks = side.book.asks.slice(0, BOOK_DEPTH).reverse(); // 높은 가격이 위로
-    const bids = side.book.bids.slice(0, BOOK_DEPTH);
+    const asks = (side.book.asks ?? []).slice(0, BOOK_DEPTH).reverse(); // 높은 가격이 위로
+    const bids = (side.book.bids ?? []).slice(0, BOOK_DEPTH);
     const max = Math.max(1, ...[...asks, ...bids].map(l => +l.volume));
     const q = quotes.get(side.code);
     const prev = q?.prevClose == null ? null : +q.prevClose;

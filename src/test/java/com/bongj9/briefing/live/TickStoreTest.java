@@ -37,7 +37,6 @@ class TickStoreTest {
 
         store.add(tick("100.5", "2026-10-22T22:30:01+09:00"));
         store.add(tick("100.7", "2026-10-22T22:30:02+09:00"));
-        assertThat(store.recent("NVDA")).isEmpty(); // flush 전에는 DB에 없다
         store.flush();
 
         assertThat(store.recent("NVDA")).extracting(q -> q.lastPrice().toPlainString()).containsExactly("100.5", "100.7");

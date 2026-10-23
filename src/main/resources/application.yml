@@ -12,6 +12,10 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
+  task:
+    scheduling:
+      pool:
+        size: 4 # 10분짜리 뉴스 수집이 웹소켓 PING·체결 저장을 막지 않도록
   web:
     error:
       include-message: always # 화면에 "없는 티커" 같은 이유를 보여주려고

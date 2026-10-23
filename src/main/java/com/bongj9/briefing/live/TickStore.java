@@ -4,7 +4,6 @@ import com.bongj9.briefing.quote.Quote;
 import com.bongj9.briefing.quote.QuoteService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -22,6 +21,7 @@ class TickStore {
 
     private static final Logger log = LoggerFactory.getLogger(TickStore.class);
     private static final int RECENT = 1000;
+    private static final int MAX_PENDING = 200_000; // DB가 멈췄을 때 메모리에 들고 있을 최대 체결 수 (약 수십 MB)
 
     private final JdbcTemplate jdbc;
     private final QuoteService quoteService;
@@ -32,11 +32,19 @@ class TickStore {
         this.quoteService = quoteService;
     }
 
+    // 시각을 못 읽는 체결은 여기서 버린다 (배치 하나가 통째로 실패하지 않게)
     void add(Quote quote) {
+        try {
+            OffsetDateTime.parse(quote.timestamp());
+        } catch (RuntimeException e) {
+            log.warn("시각을 읽을 수 없는 체결 무시 [{}]: {}", quote.stockCode(), quote.timestamp());
+            return;
+        }
         pending.add(quote);
     }
 
-    // ponytail: 앱이 갑자기 죽으면 최대 1초치 체결을 잃는다. 하나도 잃으면 안 되면 디스크 큐(카프카 등)를 앞에 둘 것
+    // DB가 잠깐 멈추면 다음 주기에 다시 넣는다. 너무 오래 멈춰 MAX_PENDING을 넘으면 그때부터 버린다
+    // ponytail: 앱이 갑자기 죽으면 메모리에 있던 체결은 잃는다. 하나도 잃으면 안 되면 디스크 큐(카프카 등)를 앞에 둘 것
     @Scheduled(fixedDelay = 1_000)
     void flush() {
         List<Quote> batch = new ArrayList<>();
@@ -55,8 +63,13 @@ class TickStore {
                         ps.setBigDecimal(4, q.volume());
                         ps.setString(5, q.currency());
                     });
-        } catch (DataAccessException e) {
-            log.error("체결 {}건 저장 실패: {}", batch.size(), e.getMessage());
+        } catch (RuntimeException e) {
+            if (pending.size() + batch.size() <= MAX_PENDING) {
+                pending.addAll(batch);
+                log.error("체결 {}건 저장 실패, 다음에 다시 시도: {}", batch.size(), e.getMessage());
+            } else {
+                log.error("체결 {}건 저장 실패, 대기열이 가득 차서 버림: {}", batch.size(), e.getMessage());
+            }
         }
     }
 

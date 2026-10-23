@@ -15,6 +15,8 @@ docker compose up -d               # PostgreSQL + TimescaleDB (체결 틱은 tra
 ./gradlew bootRun
 ```
 
+H2(`./data/briefing`)를 쓰던 예전 버전의 관심종목·뉴스는 PostgreSQL로 옮겨지지 않는다. 종목은 다시 추가하면 뉴스는 다음 수집 때 다시 쌓인다.
+
 http://localhost:8080
 
 필요한 키: Finnhub(미국 뉴스), DART(국내 공시). 네이버는 국내 뉴스용으로 선택.

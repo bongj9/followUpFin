@@ -109,7 +109,10 @@ class TossStream {
     }
 
     // 구독은 full-replace: 보낼 때마다 이 배열이 현재 구독 전체가 된다. 종목마다 체결 + 호가
-    // ponytail: 연결당 구독 100건 한도라 팔로우 50종목까지. 넘으면 화면에서 보고 있는 종목만 호가를 구독할 것
+    // 연결당 100건 한도: 체결(급등락 감지에 필요)을 먼저 채우고 남는 자리만 호가에 쓴다
+    // ponytail: 51종목부터는 뒤쪽 종목의 호가가 안 온다. 그때는 화면에서 보고 있는 종목만 호가를 구독할 것
+    private static final int MAX_TOPICS = 100;
+
     private void subscribe() {
         WebSocket ws = socket;
         if (ws == null) {
@@ -118,23 +121,36 @@ class TossStream {
         Map<Boolean, List<String>> byMarket = stockRepository.findAll().stream()
                 .collect(Collectors.partitioningBy(FollowedStock::isKorean,
                         Collectors.mapping(FollowedStock::getStockCode, Collectors.toList())));
+        ws.sendText(json.writeValueAsString(declaration(byMarket)), true);
+    }
+
+    // byMarket: true = 국내 종목, false = 미국 종목
+    static List<Map<String, Object>> declaration(Map<Boolean, List<String>> byMarket) {
         List<Map<String, Object>> declaration = new ArrayList<>();
+        int room = MAX_TOPICS;
         for (String channel : List.of("trade", "orderbook")) {
-            if (!byMarket.get(false).isEmpty()) {
-                declaration.add(Map.of("type", channel + ":us", "codes", byMarket.get(false)));
-            }
-            if (!byMarket.get(true).isEmpty()) {
-                declaration.add(Map.of("type", channel + ":kr", "codes", byMarket.get(true)));
+            for (boolean korean : List.of(false, true)) {
+                List<String> codes = byMarket.get(korean);
+                codes = codes.subList(0, Math.min(codes.size(), room));
+                room -= codes.size();
+                if (!codes.isEmpty()) {
+                    declaration.add(Map.of("type", channel + (korean ? ":kr" : ":us"), "codes", codes));
+                }
             }
         }
-        ws.sendText(json.writeValueAsString(declaration), true);
+        return declaration;
     }
 
     void handle(String text) {
         JsonNode frame = json.readTree(text);
         switch (frame.path("type").asString()) {
             case "message" -> onMessage(frame);
-            case "subscriptions" -> log.info("실시간 구독: {} / 거부: {}", frame.path("subscribed"), frame.path("rejected"));
+            case "subscriptions" -> {
+                log.info("실시간 구독: {}", frame.path("subscribed"));
+                if (!frame.path("rejected").isEmpty()) {
+                    log.error("실시간 구독 거부: {}", frame.path("rejected"));
+                }
+            }
             case "error" -> log.warn("토스 실시간 오류: {}", frame.path("error"));
             default -> { } // pong
         }
