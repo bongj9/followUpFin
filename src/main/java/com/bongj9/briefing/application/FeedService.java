@@ -3,6 +3,7 @@ package com.bongj9.briefing.application;
 import com.bongj9.briefing.domain.DisclosureRepository;
 import com.bongj9.briefing.domain.FollowedStock;
 import com.bongj9.briefing.domain.FollowedStockRepository;
+import com.bongj9.briefing.domain.News;
 import com.bongj9.briefing.domain.NewsRepository;
 import com.bongj9.briefing.domain.PriceMoveRepository;
 import org.springframework.stereotype.Service;
@@ -37,16 +38,22 @@ public class FeedService {
         this.priceMoveRepository = priceMoveRepository;
     }
 
-    // stockCode나 industry로 거른다 (둘 다 null이면 전체)
+    // stockCode나 industry로 거른다 (둘 다 null이면 전체 + 시장 뉴스)
     public List<FeedItem> feed(String stockCode, String industry, int days) {
+        boolean home = stockCode == null && industry == null;
         Map<String, String> names = stockRepository.findAll().stream()
                 .filter(s -> stockCode == null || s.getStockCode().equals(stockCode))
                 .filter(s -> industry == null || industry.equals(s.getIndustry()))
                 .collect(Collectors.toMap(FollowedStock::getStockCode, FollowedStock::getName));
-        if (names.isEmpty()) {
-            return List.of();
-        }
         Instant since = Instant.now().minus(Duration.ofDays(days));
+        // 시장 뉴스는 하루 수백 건이라 종목 항목을 밀어내지 않도록 따로 자른다
+        List<FeedItem> market = home
+                ? latest(newsRepository.findByStockCodeInAndPublishedAtAfter(List.of(News.MARKET), since).stream()
+                        .map(n -> new FeedItem("MARKET", null, "시장", n.getSource(), n.getTitle(), n.getSummary(), n.getLink(), n.getPublishedAt())))
+                : List.of();
+        if (names.isEmpty()) {
+            return market;
+        }
         LocalDate sinceDate = LocalDate.ofInstant(since, SEOUL);
 
         Stream<FeedItem> news = newsRepository.findByStockCodeInAndPublishedAtAfter(names.keySet(), since).stream()
@@ -64,8 +71,11 @@ public class FeedService {
                         "현재가 " + m.getLastPrice().toPlainString() + " " + m.getCurrency() + " · 눌러서 관련 뉴스 보기",
                         null, m.getDetectedAt()));
 
-        return Stream.of(moves, news, disclosures).flatMap(s -> s)
-                .sorted(Comparator.comparing(FeedItem::at, Comparator.reverseOrder()))
+        return Stream.concat(latest(Stream.of(moves, news, disclosures).flatMap(s -> s)).stream(), market.stream()).toList();
+    }
+
+    private static List<FeedItem> latest(Stream<FeedItem> items) {
+        return items.sorted(Comparator.comparing(FeedItem::at, Comparator.reverseOrder()))
                 .limit(MAX_ITEMS)
                 .toList();
     }

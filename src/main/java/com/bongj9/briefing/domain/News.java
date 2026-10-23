@@ -15,6 +15,7 @@ import java.time.Instant;
         indexes = @Index(columnList = "stockCode, publishedAt"))
 public class News {
 
+    public static final String MARKET = "MARKET"; // 시장 뉴스의 stockCode (종목코드와 겹치지 않음)
     private static final int SUMMARY_MAX = 1000;
 
     @Id

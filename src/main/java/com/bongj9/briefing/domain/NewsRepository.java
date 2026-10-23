@@ -10,5 +10,7 @@ public interface NewsRepository extends JpaRepository<News, Long> {
 
     List<News> findByStockCodeAndLinkIn(String stockCode, Collection<String> links);
 
+    List<News> findByStockCodeAndTitleIn(String stockCode, Collection<String> titles);
+
     List<News> findByStockCodeInAndPublishedAtAfter(Collection<String> stockCodes, Instant since);
 }

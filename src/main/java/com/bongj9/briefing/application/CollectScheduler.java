@@ -51,6 +51,12 @@ class CollectScheduler {
             }
         }
 
+        try {
+            log.info("시장 뉴스 수집: 신규 {}건", newsCollector.collectMarket());
+        } catch (RuntimeException e) {
+            log.error("시장 뉴스 수집 실패: {}", e.getMessage());
+        }
+
         // 뉴스를 먼저 모은 뒤 감지해야 급등락 시점의 기사가 피드에 같이 있다
         try {
             for (PriceMove move : priceMoveDetector.detect()) {

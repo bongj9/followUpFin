@@ -81,6 +81,7 @@
   .badge.NEWS { background: var(--news); }
   .badge.DISCLOSURE { background: var(--disc); }
   .badge.MOVE { background: #dc2626; }
+  .badge.MARKET { background: #4f46e5; }
   .item.MOVE { background: #fff7ed; border-radius: 8px; cursor: pointer; }
   .item.MOVE .title { font-weight: 700; margin: 4px 0; }
   .item a { display: block; color: var(--text); text-decoration: none; font-weight: 600; margin: 4px 0; }
@@ -141,7 +142,7 @@
 <script>
   // selected: null(전체) | { stockCode, label } | { industry, label }
   let selected = null;
-  const LABEL = { NEWS: '뉴스', DISCLOSURE: '공시', MOVE: '변동' };
+  const LABEL = { NEWS: '뉴스', DISCLOSURE: '공시', MOVE: '변동', MARKET: '시장' };
   const NO_INDUSTRY = '분류 없음';
 
   // 외부 데이터(기사 제목 등)는 innerHTML 대신 textContent로만 넣는다
@@ -555,10 +556,11 @@
   }
 
   // 피드 탭 (토스 종목 화면 아래 탭처럼)
-  const TABS = [[null, '전체'], ['NEWS', '뉴스'], ['DISCLOSURE', '공시'], ['MOVE', '급등락']];
+  const TABS = [[null, '전체'], ['NEWS', '뉴스'], ['DISCLOSURE', '공시'], ['MOVE', '급등락'], ['MARKET', '시장']];
   let feedType = null;
   function renderTabs() {
-    document.getElementById('tabs').replaceChildren(...TABS.map(([type, label]) =>
+    if (selected && feedType === 'MARKET') feedType = null; // 시장 탭은 홈에만
+    document.getElementById('tabs').replaceChildren(...TABS.filter(([type]) => !selected || type !== 'MARKET').map(([type, label]) =>
       el('button', { textContent: label, className: type === feedType ? 'active' : '', onclick: () => { feedType = type; renderTabs(); loadFeed(); } })));
   }
 
@@ -689,7 +691,7 @@
   async function loadFeed() {
     const q = selected?.stockCode ? '?stockCode=' + encodeURIComponent(selected.stockCode)
       : selected?.industry ? '?industry=' + encodeURIComponent(selected.industry) : '';
-    const items = (await (await fetch('/api/feed' + q)).json()).filter(i => !feedType || i.type === feedType);
+    const items = (await (await fetch('/api/feed' + q)).json()).filter(i => feedType ? i.type === feedType : i.type !== 'MARKET'); // 시장 뉴스는 시장 탭에서만
     document.getElementById('feedTitle').textContent = selected?.stockCode ? '뉴스·공시' : selected ? selected.label + ' 뉴스·공시' : '전체 뉴스·공시';
     const feed = document.getElementById('feed');
     if (!items.length) {
@@ -729,6 +731,7 @@
   async function refresh() {
     // 종목을 골랐으면 종목 페이지, 아니면 홈. 차트를 만들기 전에 바꿔야 차트가 제 크기로 그려진다
     document.getElementById('main').classList.toggle('page-stock', !!selected?.stockCode);
+    renderTabs(); // 시장 탭은 홈에서만 보인다
     await Promise.all([loadStocks(), loadFeed(), loadChart(), loadSide()]);
     renderHead();
     renderSide(); // 전일 종가가 늦게 와도 호가 등락률을 다시 계산

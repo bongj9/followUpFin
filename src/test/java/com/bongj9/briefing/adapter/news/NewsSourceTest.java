@@ -29,7 +29,7 @@ class NewsSourceTest {
     void 구글_뉴스_RSS에서_제목의_매체명을_떼고_매체를_따로_담는다() {
         String xml = """
                 <rss><channel><item>
-                <title>삼성전자, 2나노 모뎀 - 디일렉</title>
+                <title>삼성전자, 2나노 모뎀 - 디일렉 - 디일렉</title>
                 <link>https://news.google.com/rss/articles/abc</link>
                 <pubDate>Thu, 22 Oct 2026 11:49:00 GMT</pubDate>
                 <source url="https://www.thelec.kr">디일렉</source>

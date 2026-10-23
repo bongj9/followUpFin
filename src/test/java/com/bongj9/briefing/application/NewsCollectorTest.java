@@ -32,6 +32,9 @@ class NewsCollectorTest {
     @Autowired
     NewsRepository repository;
 
+    @Autowired
+    FeedService feedService;
+
     @Test
     void 미국_종목은_Finnhub에서_받고_같은_기사는_한_번만_저장된다() {
         FollowedStock apple = new FollowedStock("AAPL", "애플", "Technology");
@@ -58,6 +61,18 @@ class NewsCollectorTest {
         when(google.fetch(samsung)).thenReturn(List.of(item("https://example.com/kr", "삼성전자 실적")));
 
         assertThat(collector.collect(samsung)).isEqualTo(1);
+    }
+
+    @Test
+    void 시장_뉴스는_MARKET으로_저장되고_홈_피드에만_나온다() {
+        NewsItem oil = new NewsItem("중동 긴장에 유가 급등", null, "연합뉴스", "https://example.com/oil", Instant.now());
+        NewsItem sameTitle = new NewsItem(oil.title(), null, "연합뉴스", "https://example.com/oil-other-link", Instant.now());
+        when(google.fetchMarket()).thenReturn(List.of(oil, oil, sameTitle)); // 같은 기사가 다른 링크로도 옴
+
+        assertThat(collector.collectMarket()).isEqualTo(1);
+        assertThat(feedService.feed(null, null, 3)).extracting(FeedService.FeedItem::type, FeedService.FeedItem::title)
+                .contains(org.assertj.core.groups.Tuple.tuple("MARKET", "중동 긴장에 유가 급등"));
+        assertThat(feedService.feed("005930", null, 3)).extracting(FeedService.FeedItem::type).doesNotContain("MARKET");
     }
 
     private NewsItem item(String url, String title) {
