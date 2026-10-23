@@ -52,12 +52,17 @@ public class GoogleNewsClient implements NewsSource, MarketNewsSource {
     }
 
     private List<NewsItem> search(String query) {
+        return search(query, "ko", "KR", "KR:ko");
+    }
+
+    // 미국 매체 검색(PressNewsClient)은 영어판을 쓴다. 영어는 hl=en-US로 써야 한다 (en이면 302로 돌려보내고 본문이 비어 온다)
+    List<NewsItem> search(String query, String hl, String country, String ceid) {
         byte[] xml = restClient.get()
                 .uri(u -> u.path("/search")
                         .queryParam("q", "{q}")
-                        .queryParam("hl", "ko")
-                        .queryParam("gl", "KR")
-                        .queryParam("ceid", "KR:ko")
+                        .queryParam("hl", hl)
+                        .queryParam("gl", country)
+                        .queryParam("ceid", ceid)
                         .build(query))
                 .retrieve()
                 .body(byte[].class);

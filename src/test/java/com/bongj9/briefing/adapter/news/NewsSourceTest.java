@@ -23,6 +23,16 @@ class NewsSourceTest {
         assertThat(google.supports(samsung)).isTrue();
         assertThat(google.supports(apple)).isFalse();
         assertThat(new FinnhubClient("").supports(apple)).isFalse(); // 키가 없으면 안 맡는다
+        assertThat(new PressNewsClient(google).supports(apple)).isTrue(); // 미국 종목은 Finnhub과 같이 받는다
+        assertThat(new PressNewsClient(google).supports(samsung)).isFalse();
+    }
+
+    @Test
+    void 주요_매체는_법인_꼬리를_뗀_회사_이름이_제목에_있는_기사만_찾는다() {
+        assertThat(PressNewsClient.query(new FollowedStock("NVDA", "NVIDIA Corp", null))).isEqualTo("intitle:\"NVIDIA\"");
+        assertThat(PressNewsClient.query(new FollowedStock("AAPL", "Apple Inc", null))).isEqualTo("intitle:\"Apple\"");
+        assertThat(PressNewsClient.query(new FollowedStock("MU", "Micron Technology Inc", null))).isEqualTo("intitle:\"Micron\"");
+        assertThat(PressNewsClient.query(new FollowedStock("TSLA", "Tesla, Inc.", null))).isEqualTo("intitle:\"Tesla\"");
     }
 
     @Test

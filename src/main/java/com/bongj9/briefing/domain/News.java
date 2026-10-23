@@ -62,9 +62,9 @@ public class News {
     public String getTitleKo() { return titleKo; }
     public String getSummaryKo() { return summaryKo; }
 
-    // 미국 종목 기사(Finnhub)만 영어다. 국내 종목·시장 뉴스는 구글 뉴스 한국어
+    // 한글이 없는 제목이면 영어 기사 (미국 종목 기사, 시장 뉴스 중 로이터·블룸버그·CNBC)
     public boolean isEnglish() {
-        return !FollowedStock.isKoreanCode(stockCode) && !MARKET.equals(stockCode);
+        return !title.matches("(?s).*[가-힣].*");
     }
 
     public void translate(String titleKo, String summaryKo) {
