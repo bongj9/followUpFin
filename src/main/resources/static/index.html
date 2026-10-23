@@ -12,14 +12,22 @@
   header { padding: 16px 20px; border-bottom: 1px solid var(--line); background: var(--card); display: flex; justify-content: space-between; align-items: center; }
   h1 { font-size: 18px; margin: 0; }
   #updated { color: var(--muted); font-size: 13px; }
-  /* 토스 종목 화면 배치: 관심종목 | 차트·피드 | 호가·체결 (종목을 고르면 오른쪽 칸이 생긴다) */
-  main { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 16px; padding: 16px 20px; max-width: 1440px; margin: 0 auto; align-items: start; }
-  main.with-side { grid-template-columns: 280px minmax(0, 1fr) 300px; }
-  @media (max-width: 1100px) { main.with-side { grid-template-columns: 280px minmax(0, 1fr); } #side { grid-column: 2; } }
-  @media (max-width: 720px) { main, main.with-side { grid-template-columns: minmax(0, 1fr); padding: 12px 16px; } #side { grid-column: auto; } header { padding: 12px 16px; gap: 8px; } #updated { display: none; } }
-  #side[hidden], #head[hidden] { display: none; }
+  /* 두 페이지. 홈: 관심종목 | 뉴스·공시 / 종목(main.page-stock): 헤더, 차트 | 이 종목 뉴스·공시, 아래 투자자·호가·체결 */
+  main { display: grid; grid-template-columns: 280px minmax(0, 1fr); grid-template-areas: "watch feed"; gap: 16px; padding: 16px 20px; max-width: 1440px; margin: 0 auto; align-items: start; }
+  #watch { grid-area: watch; } #feedBox { grid-area: feed; } #head { grid-area: head; } #chartSection { grid-area: chart; } #below { grid-area: below; }
+  #head, #chartSection, #below { display: none; }
+  main.page-stock { grid-template-columns: minmax(0, 1fr) 380px; grid-template-areas: "head head" "chart feed" "below feed"; }
+  main.page-stock #watch { display: none; }
+  main.page-stock #head { display: flex; } main.page-stock #chartSection { display: block; } main.page-stock #below { display: grid; }
+  main.page-stock #feedBox { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; } /* 차트를 내려 봐도 뉴스는 옆에 남는다 */
+  #below { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; align-items: start; }
+  @media (max-width: 1100px) { main.page-stock { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "chart" "feed" "below"; } main.page-stock #feedBox { position: static; max-height: none; } }
+  @media (max-width: 720px) { main { grid-template-columns: minmax(0, 1fr); grid-template-areas: "watch" "feed"; padding: 12px 16px; } header { padding: 12px 16px; gap: 8px; } #updated { display: none; } }
   .up { color: #dc2626; } .down { color: #2563eb; }
-  #head { display: flex; flex-direction: column; gap: 2px; padding: 4px 4px 12px; }
+  #head { align-items: center; gap: 12px; padding: 0 4px; }
+  #head .back { border: 1px solid var(--line); background: var(--card); border-radius: 8px; width: 36px; height: 36px; font-size: 18px; cursor: pointer; color: var(--text); }
+  #head .back:hover { background: var(--bg); }
+  h1 { cursor: pointer; }
   #head .name { display: flex; gap: 8px; align-items: baseline; }
   #head .name b { font-size: 17px; }
   #head .name small { color: var(--muted); font-size: 13px; }
@@ -29,8 +37,7 @@
   .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 4px 0 4px; }
   .tabs button { border: 0; background: none; padding: 10px 12px; font-size: 14px; font-family: inherit; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
   .tabs button.active { color: var(--text); font-weight: 700; border-bottom-color: var(--text); }
-  #side { display: flex; flex-direction: column; gap: 12px; }
-  #side h2 { margin-top: 0; }
+  #below h2, #feedBox > h2 { margin-top: 0; }
   .lvl { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; height: 28px; font-size: 12px; font-variant-numeric: tabular-nums; }
   .lvl.ask { background: #f5f8ff; } .lvl.bid { background: #fff6f6; }
   .lvl .vol { padding: 0 8px; height: 100%; display: flex; align-items: center; }
@@ -45,7 +52,6 @@
   .trow.head { color: var(--muted); border-bottom: 1px solid var(--line); }
   #trades { max-height: 420px; overflow-y: auto; }
   /* 투자자별 순매수 (차트 아래): 날짜 | 개인 | 외국인 | 기관 */
-  #investorBox { margin-top: 16px; }
   .irow { display: grid; grid-template-columns: 72px repeat(3, 1fr); padding: 5px 8px; font-size: 13px; font-variant-numeric: tabular-nums; }
   .irow span:not(:first-child) { text-align: right; }
   .irow.head { color: var(--muted); border-bottom: 1px solid var(--line); }
@@ -80,7 +86,7 @@
   .item a { display: block; color: var(--text); text-decoration: none; font-weight: 600; margin: 4px 0; }
   .item a:hover { color: var(--accent); }
   .item p { margin: 0; font-size: 13px; color: var(--muted); }
-  #chartBox { margin-bottom: 12px; border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
+  #chartBox { padding: 0; }
   #chartBox[hidden] { display: none; }
   #chartBox:fullscreen { background: var(--card); padding: 16px; display: flex; flex-direction: column; }
   #chartBox:fullscreen #chartWrap { flex: 1; height: auto !important; }
@@ -107,7 +113,7 @@
 <body>
 <header><h1>종목 브리핑</h1><span><span id="live">실시간 연결 중…</span> · <span id="updated"></span></span></header>
 <main id="main">
-  <aside>
+  <aside id="watch">
     <h2>관심 종목</h2>
     <div id="stocks"></div>
     <form id="follow">
@@ -117,18 +123,20 @@
     </form>
     <div id="error"></div>
   </aside>
-  <section>
-    <div id="head" hidden></div>
+  <div id="head"></div>
+  <section id="chartSection">
     <div id="chartBox" hidden><div id="toolbar"></div><div id="chartWrap"><div id="legend"></div><div id="measure" hidden></div><div id="chart"></div></div></div>
-    <div id="investorBox" hidden><h2>투자자별 순매수 <span id="holding"></span></h2><div id="investors"></div></div>
-    <h2 id="feedTitle">전체 피드</h2>
+  </section>
+  <div id="below">
+    <section id="investorBox" hidden><h2>투자자별 순매수 <span id="holding"></span></h2><div id="investors"></div></section>
+    <section><h2>호가</h2><div id="book"></div></section>
+    <section><h2>체결</h2><div id="trades"></div></section>
+  </div>
+  <section id="feedBox">
+    <h2 id="feedTitle">전체 뉴스·공시</h2>
     <div class="tabs" id="tabs"></div>
     <div id="feed"></div>
   </section>
-  <aside id="side" hidden>
-    <div><h2>호가</h2><div id="book"></div></div>
-    <div><h2>체결</h2><div id="trades"></div></div>
-  </aside>
 </main>
 <script>
   // selected: null(전체) | { stockCode, label } | { industry, label }
@@ -538,10 +546,12 @@
     const s = stockList.find(x => x.stockCode === code);
     const q = quotes.get(code);
     head.replaceChildren(
-      el('div', { className: 'name' }, el('b', { textContent: s?.name ?? code }),
-        el('small', { textContent: code + (s?.industry ? ' · ' + s.industry : '') })),
-      el('div', { className: 'price' }, el('span', { className: 'last', textContent: q ? priceText(q) : '-' }),
-        el('span', { className: 'chg ' + dirClass(q?.changeRate), textContent: q ? changeText(q) : '' })));
+      el('button', { className: 'back', textContent: '←', title: '전체 뉴스로', onclick: () => select(null) }),
+      el('div', {},
+        el('div', { className: 'name' }, el('b', { textContent: s?.name ?? code }),
+          el('small', { textContent: code + (s?.industry ? ' · ' + s.industry : '') })),
+        el('div', { className: 'price' }, el('span', { className: 'last', textContent: q ? priceText(q) : '-' }),
+          el('span', { className: 'chg ' + dirClass(q?.changeRate), textContent: q ? changeText(q) : '' }))));
   }
 
   // 피드 탭 (토스 종목 화면 아래 탭처럼)
@@ -558,8 +568,6 @@
   const isKoreanCode = code => /^\d{6}$/.test(code);
   async function loadSide() {
     const code = selected?.stockCode ?? null;
-    document.getElementById('main').classList.toggle('with-side', !!code);
-    document.getElementById('side').hidden = !code;
     if (code === side.code) return;
     const s = side = { code, book: null, trades: [], investors: null, error: '' };
     renderSide();
@@ -648,8 +656,7 @@
     const del = el('button', { textContent: '×', title: '팔로우 해제', onclick: async ev => {
       ev.stopPropagation();
       await fetch('/api/stocks/' + encodeURIComponent(s.stockCode), { method: 'DELETE' });
-      if (selected?.stockCode === s.stockCode) selected = null;
-      refresh();
+      if (selected?.stockCode === s.stockCode) select(null); else refresh();
     }});
     const active = selected?.stockCode === s.stockCode ? ' active' : '';
     return el('div', { className: 'stock indent' + active, onclick: () => select({ stockCode: s.stockCode, label: s.name }) },
@@ -683,7 +690,7 @@
     const q = selected?.stockCode ? '?stockCode=' + encodeURIComponent(selected.stockCode)
       : selected?.industry ? '?industry=' + encodeURIComponent(selected.industry) : '';
     const items = (await (await fetch('/api/feed' + q)).json()).filter(i => !feedType || i.type === feedType);
-    document.getElementById('feedTitle').textContent = selected?.stockCode ? '' : selected ? selected.label + ' 피드' : '전체 피드';
+    document.getElementById('feedTitle').textContent = selected?.stockCode ? '뉴스·공시' : selected ? selected.label + ' 뉴스·공시' : '전체 뉴스·공시';
     const feed = document.getElementById('feed');
     if (!items.length) {
       feed.replaceChildren(el('div', { className: 'empty', textContent: feedType ? '이 탭에 해당하는 항목이 없어요.' : '아직 모인 정보가 없습니다. 종목을 추가하거나 다음 수집(10분)을 기다려 주세요.' }));
@@ -705,9 +712,23 @@
       el('p', { textContent: i.summary }))));
   }
 
-  function select(target) { selected = target; refresh(); }
+  // 주소로 화면을 정한다 (#/, #/stock/005930, #/industry/이름). 새로고침·뒤로가기·링크 공유가 된다
+  function parseHash() {
+    const [, kind, value] = location.hash.match(/^#\/(stock|industry)\/(.+)$/) ?? [];
+    const v = value && decodeURIComponent(value);
+    return kind === 'stock' ? { stockCode: v, label: v } : kind === 'industry' ? { industry: v, label: v } : null;
+  }
+  function select(target) {
+    const hash = target?.stockCode ? '#/stock/' + encodeURIComponent(target.stockCode)
+      : target?.industry ? '#/industry/' + encodeURIComponent(target.industry) : '#/';
+    if (location.hash === hash) refresh(); else location.hash = hash; // 바뀌면 hashchange가 refresh
+  }
+  window.addEventListener('hashchange', () => { selected = parseHash(); window.scrollTo(0, 0); refresh(); });
+  document.querySelector('h1').onclick = () => select(null);
 
   async function refresh() {
+    // 종목을 골랐으면 종목 페이지, 아니면 홈. 차트를 만들기 전에 바꿔야 차트가 제 크기로 그려진다
+    document.getElementById('main').classList.toggle('page-stock', !!selected?.stockCode);
     await Promise.all([loadStocks(), loadFeed(), loadChart(), loadSide()]);
     renderHead();
     renderSide(); // 전일 종가가 늦게 와도 호가 등락률을 다시 계산
@@ -752,6 +773,7 @@
     scheduleSide();
   });
 
+  selected = parseHash();
   renderTabs();
   refresh();
   setInterval(refresh, 60_000);
