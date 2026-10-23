@@ -9,18 +9,21 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 
-// 실시간 시세가 들어왔을 때의 흐름: 시세 계산 → 화면 전송 → 급등락 감지 (체결은 저장하지 않는다)
+// 실시간 시세가 들어왔을 때의 흐름: 시세 계산 → 화면 전송 → 급등락 감지(전일 대비, 장중) (체결은 저장하지 않는다)
 @Service
 public class LiveFeed {
 
     private static final Logger log = LoggerFactory.getLogger(LiveFeed.class);
     private final QuoteService quoteService;
     private final PriceMoveDetector detector;
+    private final IntradayMoveDetector intradayDetector;
     private final LiveEvents events;
 
-    public LiveFeed(QuoteService quoteService, PriceMoveDetector detector, LiveEvents events) {
+    public LiveFeed(QuoteService quoteService, PriceMoveDetector detector, IntradayMoveDetector intradayDetector,
+                    LiveEvents events) {
         this.quoteService = quoteService;
         this.detector = detector;
+        this.intradayDetector = intradayDetector;
         this.events = events;
     }
 
@@ -29,6 +32,11 @@ public class LiveFeed {
         events.send("trade", quote);
         detector.check(quote).ifPresent(move -> {
             log.info("큰 변동 감지 [{}]: {}%", move.getStockCode(), move.getChangeRate());
+            events.send("move", move);
+        });
+        intradayDetector.check(quote).ifPresent(move -> {
+            log.info("장중 급등락 감지 [{}]: {}분 새 {}% (평소 {}%)", move.getStockCode(), move.getWindowMinutes(),
+                    move.getChangeRate(), move.getNormalRate());
             events.send("move", move);
         });
     }

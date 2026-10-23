@@ -22,13 +22,16 @@ class CollectScheduler {
     private final NewsCollector newsCollector;
     private final FollowedStockRepository stockRepository;
     private final PriceMoveDetector priceMoveDetector;
+    private final IntradayMoveDetector intradayMoveDetector;
 
     CollectScheduler(DisclosureCollector disclosureCollector, NewsCollector newsCollector,
-                     FollowedStockRepository stockRepository, PriceMoveDetector priceMoveDetector) {
+                     FollowedStockRepository stockRepository, PriceMoveDetector priceMoveDetector,
+                     IntradayMoveDetector intradayMoveDetector) {
         this.disclosureCollector = disclosureCollector;
         this.newsCollector = newsCollector;
         this.stockRepository = stockRepository;
         this.priceMoveDetector = priceMoveDetector;
+        this.intradayMoveDetector = intradayMoveDetector;
     }
 
     // 수집원 하나가 실패해도 나머지는 계속 돈다
@@ -65,5 +68,7 @@ class CollectScheduler {
         } catch (RuntimeException e) {
             log.error("시세 변동 감지 실패: {}", e.getMessage());
         }
+
+        intradayMoveDetector.refresh(); // 장중 급등락 기준(종목별 평소 변동). 종목별 실패는 안에서 거른다
     }
 }

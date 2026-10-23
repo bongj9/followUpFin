@@ -6,6 +6,7 @@ import com.bongj9.briefing.domain.DisclosureItem;
 import com.bongj9.briefing.domain.DisclosureRepository;
 import com.bongj9.briefing.domain.FollowedStock;
 import com.bongj9.briefing.domain.FollowedStockRepository;
+import com.bongj9.briefing.domain.IntradayMoveRepository;
 import com.bongj9.briefing.domain.News;
 import com.bongj9.briefing.domain.NewsRepository;
 import com.bongj9.briefing.domain.PriceMoveRepository;
@@ -33,11 +34,13 @@ public class FeedService {
     private final NewsRepository newsRepository;
     private final DisclosureRepository disclosureRepository;
     private final PriceMoveRepository priceMoveRepository;
+    private final IntradayMoveRepository intradayMoveRepository;
     private final List<DisclosureSource> disclosureSources;
 
     public FeedService(FollowedStockRepository stockRepository, NewsRepository newsRepository,
                    DisclosureRepository disclosureRepository, PriceMoveRepository priceMoveRepository,
-                   List<DisclosureSource> disclosureSources) {
+                   IntradayMoveRepository intradayMoveRepository, List<DisclosureSource> disclosureSources) {
+        this.intradayMoveRepository = intradayMoveRepository;
         this.disclosureSources = disclosureSources;
         this.stockRepository = stockRepository;
         this.newsRepository = newsRepository;
@@ -79,7 +82,16 @@ public class FeedService {
                         "현재가 " + m.getLastPrice().toPlainString() + " " + m.getCurrency() + " · 눌러서 관련 뉴스 보기",
                         null, m.getDetectedAt()));
 
-        return Stream.concat(latest(Stream.of(moves, news, disclosures).flatMap(s -> s)).stream(), market.stream()).toList();
+        Stream<FeedItem> intraday = intradayMoveRepository.findByStockCodeInAndDetectedAtAfter(names.keySet(), since).stream()
+                .map(m -> new FeedItem("MOVE", m.getStockCode(), names.get(m.getStockCode()), "토스증권",
+                        String.format("%s %d분 새 %+.2f%% %s", names.get(m.getStockCode()), m.getWindowMinutes(),
+                                m.getChangeRate(), m.getChangeRate().signum() > 0 ? "급등" : "급락"),
+                        String.format("평소 %d분 변동 ±%.2f%%의 %.0f배 · %s → %s %s · 눌러서 관련 뉴스 보기", m.getWindowMinutes(),
+                                m.getNormalRate(), m.getChangeRate().abs().doubleValue() / Math.max(m.getNormalRate().doubleValue(), 0.01),
+                                m.getFromPrice().toPlainString(), m.getLastPrice().toPlainString(), m.getCurrency()),
+                        null, m.getDetectedAt()));
+
+        return Stream.concat(latest(Stream.of(moves, intraday, news, disclosures).flatMap(s -> s)).stream(), market.stream()).toList();
     }
 
     private static List<FeedItem> latest(Stream<FeedItem> items) {

@@ -4,6 +4,7 @@ import com.bongj9.briefing.application.port.DisclosureSource;
 import com.bongj9.briefing.domain.DisclosureItem;
 import com.bongj9.briefing.domain.DisclosureRepository;
 import com.bongj9.briefing.domain.FollowedStockRepository;
+import com.bongj9.briefing.domain.IntradayMoveRepository;
 import com.bongj9.briefing.domain.NewsRepository;
 import com.bongj9.briefing.domain.PriceMoveRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,7 +24,7 @@ class FeedServiceTest {
 
     DisclosureSource source = mock(DisclosureSource.class);
     FeedService service = new FeedService(mock(FollowedStockRepository.class), mock(NewsRepository.class),
-            mock(DisclosureRepository.class), mock(PriceMoveRepository.class), List.of(source));
+            mock(DisclosureRepository.class), mock(PriceMoveRepository.class), mock(IntradayMoveRepository.class), List.of(source));
 
     @BeforeEach
     void setUp() {
