@@ -547,6 +547,8 @@
   }
 
   // 종목 헤더: 이름·코드·현재가·전일 대비 (토스 종목 화면 맨 위)
+  // 체결마다(1초에 여러 번) 불리므로 종목이 바뀔 때만 새로 만들고 가격은 글자만 바꾼다
+  // 통째로 다시 만들면 ← 버튼을 누르는 사이에 버튼이 바뀌어 클릭이 사라진다 (20번 중 8번 실패)
   const quotes = new Map(); // 종목 → 최신 시세 (/api/quotes + 실시간 체결)
   function renderHead() {
     const head = document.getElementById('head');
@@ -555,13 +557,20 @@
     if (!code) return;
     const s = stockList.find(x => x.stockCode === code);
     const q = quotes.get(code);
-    head.replaceChildren(
-      el('button', { className: 'back', textContent: '←', title: '전체 뉴스로', onclick: () => select(null) }),
-      el('div', {},
-        el('div', { className: 'name' }, el('b', { textContent: s?.name ?? code }),
-          el('small', { textContent: code + (s?.industry ? ' · ' + s.industry : '') })),
-        el('div', { className: 'price' }, el('span', { className: 'last', textContent: q ? priceText(q) : '-' }),
-          el('span', { className: 'chg ' + dirClass(q?.changeRate), textContent: q ? changeText(q) : '' }))));
+    const key = code + '|' + (s?.name ?? '') + '|' + (s?.industry ?? '');
+    if (head.dataset.key !== key) {
+      head.dataset.key = key;
+      head.replaceChildren(
+        el('button', { className: 'back', textContent: '←', title: '전체 뉴스로', onclick: () => select(null) }),
+        el('div', {},
+          el('div', { className: 'name' }, el('b', { textContent: s?.name ?? code }),
+            el('small', { textContent: code + (s?.industry ? ' · ' + s.industry : '') })),
+          el('div', { className: 'price' }, el('span', { className: 'last' }), el('span', { className: 'chg' }))));
+    }
+    head.querySelector('.last').textContent = q ? priceText(q) : '-';
+    const chg = head.querySelector('.chg');
+    chg.className = 'chg ' + dirClass(q?.changeRate);
+    chg.textContent = q ? changeText(q) : '';
   }
 
   // 피드 탭 (토스 종목 화면 아래 탭처럼)
@@ -865,7 +874,13 @@
       scheduleSide();
     }
     document.querySelectorAll('.quote').forEach(old => {
-      if (old.dataset.code === q.stockCode) old.replaceWith(withCode(quoteBox(q), q.stockCode));
+      if (old.dataset.code !== q.stockCode) return;
+      // 이미 그려진 칸은 글자만 바꾼다. 통째로 바꾸면 누르는 사이에 칸이 바뀌어 종목 클릭이 사라진다
+      old.className = 'quote' + (q.bigMove ? ' big' : '');
+      old.title = '전일 종가 ' + (q.prevClose ?? '-');
+      old.children[0].textContent = priceText(q);
+      old.children[1].className = 'rate ' + dirClass(q.changeRate);
+      old.children[1].textContent = changeText(q);
     });
     onTradeChart(q);
   });
