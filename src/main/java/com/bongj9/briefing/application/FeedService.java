@@ -1,5 +1,6 @@
 package com.bongj9.briefing.application;
 
+import com.bongj9.briefing.application.port.DisclosureSource;
 import com.bongj9.briefing.domain.DisclosureRepository;
 import com.bongj9.briefing.domain.FollowedStock;
 import com.bongj9.briefing.domain.FollowedStockRepository;
@@ -29,9 +30,12 @@ public class FeedService {
     private final NewsRepository newsRepository;
     private final DisclosureRepository disclosureRepository;
     private final PriceMoveRepository priceMoveRepository;
+    private final DisclosureSource disclosureSource;
 
     public FeedService(FollowedStockRepository stockRepository, NewsRepository newsRepository,
-                   DisclosureRepository disclosureRepository, PriceMoveRepository priceMoveRepository) {
+                   DisclosureRepository disclosureRepository, PriceMoveRepository priceMoveRepository,
+                   DisclosureSource disclosureSource) {
+        this.disclosureSource = disclosureSource;
         this.stockRepository = stockRepository;
         this.newsRepository = newsRepository;
         this.disclosureRepository = disclosureRepository;
@@ -78,6 +82,20 @@ public class FeedService {
         return items.sorted(Comparator.comparing(FeedItem::at, Comparator.reverseOrder()))
                 .limit(MAX_ITEMS)
                 .toList();
+    }
+
+    // 종목 페이지 공시 탭: 최근 3개월 공시를 DART에서 바로 받는다 (저장하지 않음)
+    public DisclosureList companyDisclosures(String stockCode, int offset, int limit) {
+        LocalDate today = LocalDate.now(SEOUL);
+        DisclosureSource.Page page = disclosureSource.fetchCompany(stockCode, today.minusMonths(3), today, offset, limit);
+        // ponytail: DART 목록엔 접수 시각이 없어 접수일 0시로 둔다
+        return new DisclosureList(page.items().stream()
+                .map(d -> new FeedItem("DISCLOSURE", d.stockCode(), d.corpName(), "DART", d.reportNm(),
+                        d.flrNm() + " 제출", d.url(), d.rceptDt().atStartOfDay(SEOUL).toInstant()))
+                .toList(), page.hasMore());
+    }
+
+    public record DisclosureList(List<FeedItem> items, boolean hasMore) {
     }
 
     public record FeedItem(String type, String stockCode, String stockName, String source, String title, String summary, String url, Instant at) {

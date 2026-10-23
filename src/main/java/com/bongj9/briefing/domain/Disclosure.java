@@ -53,6 +53,6 @@ public class Disclosure {
 
     // DART 원문 뷰어 링크
     public String getUrl() {
-        return "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=" + rceptNo;
+        return "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=" + rceptNo; // DisclosureItem.url()과 같은 주소
     }
 }
