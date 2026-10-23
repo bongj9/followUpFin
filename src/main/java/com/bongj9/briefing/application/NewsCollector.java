@@ -20,7 +20,7 @@ public class NewsCollector {
 
     private static final Logger log = LoggerFactory.getLogger(NewsCollector.class);
 
-    private final List<NewsSource> sources; // 스프링이 NewsSource 구현 빈을 전부 넣어 준다 (Finnhub, 네이버)
+    private final List<NewsSource> sources; // 스프링이 NewsSource 구현 빈을 전부 넣어 준다 (Finnhub, 구글 뉴스)
     private final NewsRepository repository;
 
     public NewsCollector(List<NewsSource> sources, NewsRepository repository) {
@@ -47,7 +47,7 @@ public class NewsCollector {
         return fresh.size();
     }
 
-    // 이 종목을 맡겠다는 출처를 고른다 (국내는 네이버, 미국은 Finnhub)
+    // 이 종목을 맡겠다는 출처를 고른다 (국내는 구글 뉴스, 미국은 Finnhub)
     private List<NewsItem> fetch(FollowedStock stock) {
         return sources.stream()
                 .filter(source -> source.supports(stock))

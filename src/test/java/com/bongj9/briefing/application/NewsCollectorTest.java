@@ -1,7 +1,7 @@
 package com.bongj9.briefing.application;
 
 import com.bongj9.briefing.adapter.news.FinnhubClient;
-import com.bongj9.briefing.adapter.news.NaverNewsClient;
+import com.bongj9.briefing.adapter.news.GoogleNewsClient;
 import com.bongj9.briefing.domain.FollowedStock;
 import com.bongj9.briefing.domain.News;
 import com.bongj9.briefing.domain.NewsItem;
@@ -24,7 +24,7 @@ class NewsCollectorTest {
     FinnhubClient finnhub;
 
     @MockitoBean
-    NaverNewsClient naver;
+    GoogleNewsClient google;
 
     @Autowired
     NewsCollector collector;
@@ -42,7 +42,7 @@ class NewsCollectorTest {
 
         assertThat(collector.collect(apple)).isEqualTo(2);
         assertThat(collector.collect(apple)).isZero(); // 다음 주기에 같은 기사가 와도 저장 안 함
-        assertThat(repository.findAll()).extracting(News::getTitle)
+        assertThat(repository.findAll()).filteredOn(n -> n.getStockCode().equals("AAPL")).extracting(News::getTitle)
                 .containsExactlyInAnyOrder("Apple earnings beat", "iPhone sales");
     }
 
@@ -52,10 +52,10 @@ class NewsCollectorTest {
     }
 
     @Test
-    void 국내_종목은_네이버로_간다() {
+    void 국내_종목은_구글_뉴스로_간다() {
         FollowedStock samsung = new FollowedStock("005930", "삼성전자", null);
-        when(naver.supports(samsung)).thenReturn(true);
-        when(naver.fetch(samsung)).thenReturn(List.of(item("https://example.com/kr", "삼성전자 실적")));
+        when(google.supports(samsung)).thenReturn(true);
+        when(google.fetch(samsung)).thenReturn(List.of(item("https://example.com/kr", "삼성전자 실적")));
 
         assertThat(collector.collect(samsung)).isEqualTo(1);
     }

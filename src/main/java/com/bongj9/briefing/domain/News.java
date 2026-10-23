@@ -25,8 +25,8 @@ public class News {
     private String title;
     @Column(length = SUMMARY_MAX)
     private String summary;
-    private String source; // 매체명 (네이버는 주지 않음)
-    @Column(length = 500)
+    private String source; // 매체명 (출처가 주지 않으면 null)
+    @Column(length = 2000) // 구글 뉴스 링크는 500자를 넘는다. ddl-auto는 길이를 안 바꾸니 기존 DB는 ALTER 필요
     private String link; // 같은 기사가 다른 종목에도 걸릴 수 있어 (종목, 링크)로 유일
     private Instant publishedAt;
     private Instant collectedAt;
