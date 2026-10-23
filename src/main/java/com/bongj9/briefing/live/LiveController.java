@@ -58,13 +58,21 @@ class LiveController {
     // 호가창 초기 데이터. 이후는 SSE orderbook 이벤트로 갱신
     @GetMapping("/api/orderbook")
     TossClient.Orderbook orderbook(@RequestParam String symbol) {
+        requireToss();
         return toss.orderbook(symbol.toUpperCase());
     }
 
     // 체결창 초기 데이터 (토스 당일 최근 50건, 최신순). 이후는 SSE trade 이벤트로 갱신
     @GetMapping("/api/trades")
     List<TossClient.Trade> trades(@RequestParam String symbol) {
+        requireToss();
         return toss.trades(symbol.toUpperCase());
+    }
+
+    private void requireToss() {
+        if (!toss.isConfigured()) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "secret.yml에 토스 키가 없습니다");
+        }
     }
 
     // 캔들 차트 초기 데이터 (오래된 순). time은 차트에 그대로 쓰도록 한국 시간으로 옮긴 epoch 초
