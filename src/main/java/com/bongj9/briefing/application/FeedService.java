@@ -67,8 +67,7 @@ public class FeedService {
         LocalDate sinceDate = LocalDate.ofInstant(since, SEOUL);
 
         Stream<FeedItem> news = newsRepository.findByStockCodeInAndPublishedAtAfter(names.keySet(), since).stream()
-                .map(n -> new FeedItem("NEWS", n.getStockCode(), names.get(n.getStockCode()),
-                        n.getSource(), n.getTitle(), n.getSummary(), n.getLink(), n.getPublishedAt()));
+                .map(n -> FeedItem.news(n, names.get(n.getStockCode())));
         // ponytail: DART 목록엔 접수 시각이 없어 수집 시각으로 정렬. 첫 수집분은 모두 같은 시각 (SEC는 접수 시각)
         Stream<FeedItem> disclosures = disclosureRepository.findByStockCodeInAndRceptDtGreaterThanEqual(names.keySet(), sinceDate).stream()
                 .map(d -> FeedItem.disclosure(d.getStockCode(), names.get(d.getStockCode()), d.getReportNm(), d.getFlrNm(),
@@ -138,11 +137,21 @@ public class FeedService {
     }
 
     // importance·tip은 공시에만 있다 (DisclosureGuide)
+    // newsId는 번역할 수 있는 영어 기사에만, originalTitle은 번역한 기사의 원래 제목
     public record FeedItem(String type, String stockCode, String stockName, String source, String title, String summary,
-                           String url, Instant at, String importance, String tip) {
+                           String url, Instant at, String importance, String tip, Long newsId, String originalTitle) {
 
         FeedItem(String type, String stockCode, String stockName, String source, String title, String summary, String url, Instant at) {
-            this(type, stockCode, stockName, source, title, summary, url, at, null, null);
+            this(type, stockCode, stockName, source, title, summary, url, at, null, null, null, null);
+        }
+
+        public static FeedItem news(News n, String stockName) {
+            boolean translated = n.getTitleKo() != null;
+            return new FeedItem("NEWS", n.getStockCode(), stockName, n.getSource(),
+                    translated ? n.getTitleKo() : n.getTitle(),
+                    translated && n.getSummaryKo() != null ? n.getSummaryKo() : n.getSummary(),
+                    n.getLink(), n.getPublishedAt(), null, null,
+                    n.isEnglish() ? n.getId() : null, translated ? n.getTitle() : null);
         }
 
         static FeedItem disclosure(String stockCode, String stockName, String reportNm, String flrNm, String url, Instant at) {
@@ -150,7 +159,7 @@ public class FeedService {
             String original = guide.name().equals(reportNm) ? "" : " · " + reportNm; // 바꾼 이름이면 원래 제목도 작게
             String source = FollowedStock.isKoreanCode(stockCode) ? "DART" : "SEC";
             return new FeedItem("DISCLOSURE", stockCode, stockName, source, guide.name(), flrNm + " 제출" + original,
-                    url, at, guide.importance().name(), guide.tip());
+                    url, at, guide.importance().name(), guide.tip(), null, null);
         }
 
         boolean minor() {

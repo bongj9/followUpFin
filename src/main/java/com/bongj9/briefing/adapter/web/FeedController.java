@@ -1,8 +1,11 @@
 package com.bongj9.briefing.adapter.web;
 
 import com.bongj9.briefing.application.FeedService;
+import com.bongj9.briefing.application.NewsTranslator;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -13,9 +16,21 @@ import java.util.List;
 class FeedController {
 
     private final FeedService feedService;
+    private final NewsTranslator newsTranslator;
 
-    FeedController(FeedService feedService) {
+    FeedController(FeedService feedService, NewsTranslator newsTranslator) {
         this.feedService = feedService;
+        this.newsTranslator = newsTranslator;
+    }
+
+    // POST /api/news/123/translate → 번역한 피드 항목 (한 번 번역하면 저장해 두고 다시 부르지 않는다)
+    @PostMapping("/api/news/{id}/translate")
+    FeedService.FeedItem translate(@PathVariable long id) {
+        try {
+            return FeedService.FeedItem.news(newsTranslator.translate(id), null);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        }
     }
 
     // GET /api/feed?stockCode=AAPL 또는 ?industry=Semiconductors (둘 다 없으면 전체)

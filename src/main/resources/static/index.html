@@ -100,6 +100,8 @@
   .item a { display: block; color: var(--text); text-decoration: none; font-weight: 600; margin: 4px 0; }
   .item a:hover { color: var(--accent); }
   .item p { margin: 0; font-size: 13px; color: var(--muted); }
+  .item p.original { margin: 2px 0 4px; font-size: 12px; }
+  button.translate { margin-left: auto; padding: 1px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); font: inherit; font-size: 12px; color: var(--text); cursor: pointer; }
   #chartBox { padding: 0; }
   #chartBox[hidden] { display: none; }
   #chartBox:fullscreen { background: var(--card); padding: 16px; display: flex; flex-direction: column; }
@@ -774,8 +776,24 @@
     feed.replaceChildren(...items.map(feedItem));
   }
 
+  // 영어 기사: '번역'을 누르면 서버가 DeepL로 번역해 저장한다 (다음부터는 피드가 번역문을 준다)
+  async function translateItem(i, node, button) {
+    button.disabled = true;
+    button.textContent = '번역 중…';
+    const res = await fetch(`/api/news/${i.newsId}/translate`, { method: 'POST' });
+    if (!res.ok) {
+      button.textContent = '번역 실패: ' + ((await res.json().catch(() => null))?.message ?? res.status);
+      return;
+    }
+    const t = await res.json();
+    node.replaceWith(feedItem({ ...i, title: t.title, summary: t.summary, originalTitle: t.originalTitle }));
+  }
+
   function feedItem(i) {
-    return el('div', {
+    const translate = i.newsId && !i.originalTitle
+      ? el('button', { className: 'translate', textContent: '번역', onclick: e => translateItem(i, node, e.target) })
+      : null;
+    const node = el('div', {
         className: 'item ' + i.type,
         // 변동 항목을 누르면 그 종목 피드(관련 뉴스)로 이동
         onclick: i.type === 'MOVE' ? () => select({ stockCode: i.stockCode, label: i.stockName }) : null,
@@ -786,12 +804,15 @@
         el('span', { textContent: i.stockName }),
         el('span', { textContent: i.source ?? '' }),
         // DART는 접수 시각을 주지 않아 날짜만 (SEC는 초 단위 접수 시각이 있어 시각까지)
-        el('span', { textContent: new Date(i.at).toLocaleString('ko-KR', i.source === 'DART' ? { month: 'numeric', day: 'numeric' } : { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) })),
+        el('span', { textContent: new Date(i.at).toLocaleString('ko-KR', i.source === 'DART' ? { month: 'numeric', day: 'numeric' } : { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }),
+        ...(translate ? [translate] : [])),
       i.url
         ? el('a', { href: i.url, target: '_blank', rel: 'noopener noreferrer', textContent: i.title })
         : el('div', { className: 'title', textContent: i.title }),
+      ...(i.originalTitle ? [el('p', { className: 'original', textContent: '원문: ' + i.originalTitle })] : []),
       el('p', { textContent: i.summary }),
       ...(i.tip ? [el('p', { className: 'tip', textContent: '볼 것: ' + i.tip })] : []));
+    return node;
   }
 
   // 주소로 화면을 정한다 (#/, #/stock/005930, #/industry/이름). 새로고침·뒤로가기·링크 공유가 된다

@@ -31,6 +31,10 @@ public class News {
     private String link; // 같은 기사가 다른 종목에도 걸릴 수 있어 (종목, 링크)로 유일
     private Instant publishedAt;
     private Instant collectedAt;
+    @Column(length = 500)
+    private String titleKo; // 번역 (누른 기사만, NewsTranslator)
+    @Column(length = SUMMARY_MAX * 2) // 한국어 번역이 원문보다 길 수 있다
+    private String summaryKo;
 
     protected News() {
     }
@@ -55,4 +59,16 @@ public class News {
     public String getLink() { return link; }
     public Instant getPublishedAt() { return publishedAt; }
     public Instant getCollectedAt() { return collectedAt; }
+    public String getTitleKo() { return titleKo; }
+    public String getSummaryKo() { return summaryKo; }
+
+    // 미국 종목 기사(Finnhub)만 영어다. 국내 종목·시장 뉴스는 구글 뉴스 한국어
+    public boolean isEnglish() {
+        return !FollowedStock.isKoreanCode(stockCode) && !MARKET.equals(stockCode);
+    }
+
+    public void translate(String titleKo, String summaryKo) {
+        this.titleKo = titleKo;
+        this.summaryKo = summaryKo;
+    }
 }
