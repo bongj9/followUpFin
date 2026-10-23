@@ -63,7 +63,7 @@ public class DartClient implements DisclosureSource {
     record ListResponse(
             String status,
             String message,
-            @JsonProperty("total_page") int totalPage,
+            @JsonProperty("total_page") Integer totalPage, // 오류 응답엔 없다
             List<Item> list) {
     }
 
