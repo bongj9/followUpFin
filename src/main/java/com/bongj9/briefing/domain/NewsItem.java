@@ -1,0 +1,7 @@
+package com.bongj9.briefing.domain;
+
+import java.time.Instant;
+
+// 뉴스 출처(구글 뉴스, Finnhub)가 달라도 같은 모양으로 맞춘 기사
+public record NewsItem(String title, String summary, String source, String url, Instant publishedAt) {
+}

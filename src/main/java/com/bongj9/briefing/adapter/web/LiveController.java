@@ -1,0 +1,75 @@
+package com.bongj9.briefing.adapter.web;
+
+import com.bongj9.briefing.application.CandleService;
+import com.bongj9.briefing.application.port.MarketData;
+import com.bongj9.briefing.domain.FollowedStock;
+import com.bongj9.briefing.domain.InvestorFlow;
+import com.bongj9.briefing.domain.Orderbook;
+import com.bongj9.briefing.domain.Trade;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.util.List;
+
+@RestController
+class LiveController {
+
+    private final LiveBroadcaster broadcaster;
+    private final CandleService candles;
+    private final MarketData market;
+
+    LiveController(LiveBroadcaster broadcaster, CandleService candles, MarketData market) {
+        this.broadcaster = broadcaster;
+        this.candles = candles;
+        this.market = market;
+    }
+
+    // 실시간 체결(trade)·호가(orderbook)·큰 변동(move) 스트림
+    @GetMapping("/api/stream")
+    SseEmitter stream() {
+        return broadcaster.connect();
+    }
+
+    // 호가창 초기 데이터. 이후는 SSE orderbook 이벤트로 갱신
+    @GetMapping("/api/orderbook")
+    Orderbook orderbook(@RequestParam String symbol) {
+        requireMarket();
+        return market.orderbook(symbol.toUpperCase());
+    }
+
+    // 체결창 초기 데이터 (당일 최근 50건, 최신순). 이후는 SSE trade 이벤트로 갱신
+    @GetMapping("/api/trades")
+    List<Trade> trades(@RequestParam String symbol) {
+        requireMarket();
+        return market.trades(symbol.toUpperCase());
+    }
+
+    // 국내 종목 투자자별 순매수 (최근 10일, 최신순)
+    @GetMapping("/api/investors")
+    List<InvestorFlow> investors(@RequestParam String symbol) {
+        if (!FollowedStock.isKoreanCode(symbol)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "투자자별 매매동향은 국내 종목만 있습니다");
+        }
+        requireMarket();
+        return market.investorFlows(symbol, 10);
+    }
+
+    // 캔들 차트 초기 데이터 (오래된 순)
+    @GetMapping("/api/candles")
+    List<CandleService.Bar> candles(@RequestParam String symbol, @RequestParam(defaultValue = "1m") String interval) {
+        if (!candles.supports(interval)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "지원하지 않는 주기: " + interval);
+        }
+        return candles.bars(symbol.toUpperCase(), interval);
+    }
+
+    private void requireMarket() {
+        if (!market.isConfigured()) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "secret.yml에 토스 키가 없습니다");
+        }
+    }
+}
