@@ -1,12 +1,10 @@
 package com.bongj9.briefing.adapter.web;
 
 import com.bongj9.briefing.application.CandleService;
-import com.bongj9.briefing.application.LiveFeed;
 import com.bongj9.briefing.application.port.MarketData;
 import com.bongj9.briefing.domain.FollowedStock;
 import com.bongj9.briefing.domain.InvestorFlow;
 import com.bongj9.briefing.domain.Orderbook;
-import com.bongj9.briefing.domain.Quote;
 import com.bongj9.briefing.domain.Trade;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,13 +19,11 @@ import java.util.List;
 class LiveController {
 
     private final LiveBroadcaster broadcaster;
-    private final LiveFeed feed;
     private final CandleService candles;
     private final MarketData market;
 
-    LiveController(LiveBroadcaster broadcaster, LiveFeed feed, CandleService candles, MarketData market) {
+    LiveController(LiveBroadcaster broadcaster, CandleService candles, MarketData market) {
         this.broadcaster = broadcaster;
-        this.feed = feed;
         this.candles = candles;
         this.market = market;
     }
@@ -36,12 +32,6 @@ class LiveController {
     @GetMapping("/api/stream")
     SseEmitter stream() {
         return broadcaster.connect();
-    }
-
-    // 틱 차트 초기 데이터: DB에 쌓인 최근 체결 (최대 1000건)
-    @GetMapping("/api/ticks")
-    List<Quote> ticks(@RequestParam String symbol) {
-        return feed.recentTicks(symbol.toUpperCase());
     }
 
     // 호가창 초기 데이터. 이후는 SSE orderbook 이벤트로 갱신

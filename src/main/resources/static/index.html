@@ -407,16 +407,8 @@
       const main = chart.addSeries(LC.BaselineSeries, {
         topLineColor: UP, topFillColor1: 'rgba(220,38,38,0.2)', topFillColor2: 'rgba(220,38,38,0.02)',
         bottomLineColor: DOWN, bottomFillColor1: 'rgba(37,99,235,0.02)', bottomFillColor2: 'rgba(37,99,235,0.2)' });
-      // 과거 틱을 받는 동안 온 실시간 틱은 모아 뒀다가 뒤에 붙인다 (먼저 그리면 순서가 뒤집힌다)
-      const v = view = { code, interval, chart, main, times, plots: [], compares: [], pending: [] };
-      const recent = await fetch('/api/ticks?symbol=' + encodeURIComponent(code)).then(r => r.ok ? r.json() : []).catch(() => []);
-      if (view !== v) return;
-      // 저장은 1초마다라 모아 둔 틱 일부는 과거 틱에도 들어 있다. 마지막 과거 틱보다 뒤의 것만 붙인다
-      // ponytail: 같은 시각(ms)의 체결이 여러 건이면 그 시각의 실시간 틱은 버려진다
-      const last = recent.length ? Date.parse(recent.at(-1).timestamp) : -Infinity;
-      const live = v.pending.filter(q => Date.parse(q.timestamp) > last);
-      v.pending = null;
-      [...recent, ...live].forEach(onTradeChart);
+      // 틱은 저장하지 않는다. 페이지를 연 뒤 들어오는 실시간 체결만 그린다
+      view = { code, interval, chart, main, times, plots: [], compares: [] };
       return;
     }
     const type = prefs.type;
@@ -518,7 +510,6 @@
     if (!v) return;
     if (v.interval === 'tick') {
       if (q.stockCode !== v.code) return;
-      if (v.pending) { v.pending.push(q); return; }
       if (!v.times.length) v.main.applyOptions({ baseValue: { type: 'price', price: +(q.prevClose ?? q.lastPrice) } });
       v.times.push(q.timestamp);
       v.main.update({ time: v.times.length, value: +q.lastPrice });

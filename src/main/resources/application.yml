@@ -5,7 +5,7 @@ spring:
     # API 키는 git에 올리지 않는 secret.yml에 둔다 (예시: secret.example.yml)
     import: optional:file:./secret.yml
   datasource:
-    # docker compose up -d 로 띄운 PostgreSQL + TimescaleDB (docker-compose.yml)
+    # docker compose up -d 로 띄운 PostgreSQL (docker-compose.yml)
     url: jdbc:postgresql://localhost:5432/followupfin
     username: followupfin
     password: ${DB_PASSWORD:followupfin} # 로컬 docker 전용 기본값
@@ -15,7 +15,7 @@ spring:
   task:
     scheduling:
       pool:
-        size: 4 # 10분짜리 뉴스 수집이 웹소켓 PING·체결 저장을 막지 않도록
+        size: 4 # 10분짜리 뉴스 수집이 웹소켓 PING을 막지 않도록
   web:
     error:
       include-message: always # 화면에 "없는 티커" 같은 이유를 보여주려고

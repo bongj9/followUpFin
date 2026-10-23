@@ -11,7 +11,7 @@
 
 ```bash
 cp secret.example.yml secret.yml   # 발급받은 API 키 입력 (git에 올라가지 않음)
-docker compose up -d               # PostgreSQL + TimescaleDB (체결 틱은 trade_tick에 계속 쌓인다)
+docker compose up -d               # PostgreSQL
 ./gradlew bootRun
 ```
 
@@ -24,7 +24,7 @@ http://localhost:8080
 
 ## 스택
 
-Java 21 · Spring Boot 4 · Spring Data JPA · PostgreSQL + TimescaleDB (테스트는 H2) · Vanilla JS
+Java 21 · Spring Boot 4 · Spring Data JPA · PostgreSQL (테스트는 H2) · Vanilla JS
 
 ## 다음 단계
 
