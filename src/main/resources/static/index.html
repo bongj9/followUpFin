@@ -44,6 +44,13 @@
   .trow span:not(:first-child) { text-align: right; }
   .trow.head { color: var(--muted); border-bottom: 1px solid var(--line); }
   #trades { max-height: 420px; overflow-y: auto; }
+  /* 투자자별 순매수 (차트 아래): 날짜 | 개인 | 외국인 | 기관 */
+  #investorBox { margin-top: 16px; }
+  .irow { display: grid; grid-template-columns: 72px repeat(3, 1fr); padding: 5px 8px; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .irow span:not(:first-child) { text-align: right; }
+  .irow.head { color: var(--muted); border-bottom: 1px solid var(--line); }
+  .irow small, #holding { color: var(--muted); font-size: 11px; }
+  #investorBox[hidden] { display: none; }
   aside, section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
   h2 { font-size: 14px; margin: 4px 4px 10px; color: var(--muted); }
   .stock { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
@@ -113,6 +120,7 @@
   <section>
     <div id="head" hidden></div>
     <div id="chartBox" hidden><div id="toolbar"></div><div id="chartWrap"><div id="legend"></div><div id="measure" hidden></div><div id="chart"></div></div></div>
+    <div id="investorBox" hidden><h2>투자자별 순매수 <span id="holding"></span></h2><div id="investors"></div></div>
     <h2 id="feedTitle">전체 피드</h2>
     <div class="tabs" id="tabs"></div>
     <div id="feed"></div>
@@ -538,19 +546,23 @@
 
   // 오른쪽 호가·체결. 처음엔 REST로 받고 이후는 SSE(orderbook, trade)로 갱신
   const BOOK_DEPTH = 10;
-  let side = { code: null, book: null, trades: [], error: '' };
+  let side = { code: null, book: null, trades: [], investors: null, error: '' };
+  const isKoreanCode = code => /^\d{6}$/.test(code);
   async function loadSide() {
     const code = selected?.stockCode ?? null;
     document.getElementById('main').classList.toggle('with-side', !!code);
     document.getElementById('side').hidden = !code;
     if (code === side.code) return;
-    const s = side = { code, book: null, trades: [], error: '' };
+    const s = side = { code, book: null, trades: [], investors: null, error: '' };
     renderSide();
     if (!code) return;
     const q = '?symbol=' + encodeURIComponent(code);
-    const [book, trades] = await Promise.all([
+    const [book, trades, investors] = await Promise.all([
       fetch('/api/orderbook' + q).then(r => r.ok ? r.json() : null).catch(() => null),
-      fetch('/api/trades' + q).then(r => r.ok ? r.json() : null).catch(() => null)]);
+      fetch('/api/trades' + q).then(r => r.ok ? r.json() : null).catch(() => null),
+      // 투자자별 매매동향은 국내 종목만 있다
+      isKoreanCode(code) ? fetch('/api/investors' + q).then(r => r.ok ? r.json() : []).catch(() => []) : null]);
+    s.investors = investors;
     if (side !== s) return; // 그사이 다른 종목을 골랐다
     if (!book && !trades) s.error = '토스 시세를 불러올 수 없어요 (secret.yml 토스 키·허용 IP 확인)';
     s.book = s.book ?? book; // 기다리는 동안 SSE로 더 최신 호가가 왔으면 그걸 쓴다
@@ -567,7 +579,27 @@
     if (!sideFrame) sideFrame = requestAnimationFrame(() => { sideFrame = 0; renderSide(); renderHead(); });
   }
 
-  function renderSide() { renderBook(); renderTrades(); }
+  function renderSide() { renderBook(); renderTrades(); renderInvestors(); }
+
+  // 하루치 순매수 수량(주). 당일 잠정치는 개인이 아직 없다 (다음 영업일 새벽 확정)
+  function renderInvestors() {
+    const list = side.investors;
+    document.getElementById('investorBox').hidden = list === null;
+    if (list === null) return;
+    const box = document.getElementById('investors');
+    const rate = list.find(d => d.foreignerHoldingRate != null)?.foreignerHoldingRate;
+    document.getElementById('holding').textContent = rate == null ? '' : '외국인 보유 ' + (rate * 100).toFixed(2) + '%';
+    if (!list.length) { box.replaceChildren(el('div', { className: 'empty', textContent: '투자자 동향을 불러올 수 없어요' })); return; }
+    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }); // 2026-10-23
+    const cell = v => v == null
+      ? el('span', { textContent: '집계 중' })
+      : el('span', { className: dirClass(v), textContent: (v > 0 ? '+' : '') + v.toLocaleString('en-US') });
+    box.replaceChildren(
+      el('div', { className: 'irow head' }, ...['날짜', '개인', '외국인', '기관'].map(t => el('span', { textContent: t }))),
+      ...list.map(d => el('div', { className: 'irow' },
+        el('span', {}, d.date.slice(5).replace('-', '.'), d.date === today ? el('small', { textContent: ' 잠정' }) : ''),
+        cell(d.individual), cell(d.foreigner), cell(d.institution))));
+  }
 
   function renderBook() {
     const box = document.getElementById('book');

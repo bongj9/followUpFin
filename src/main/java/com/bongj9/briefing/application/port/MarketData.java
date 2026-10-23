@@ -1,6 +1,7 @@
 package com.bongj9.briefing.application.port;
 
 import com.bongj9.briefing.domain.Candle;
+import com.bongj9.briefing.domain.InvestorFlow;
 import com.bongj9.briefing.domain.LastPrice;
 import com.bongj9.briefing.domain.Orderbook;
 import com.bongj9.briefing.domain.Trade;
@@ -24,4 +25,7 @@ public interface MarketData {
 
     // 당일 최근 체결 (최신순)
     List<Trade> trades(String symbol);
+
+    // 국내 종목만. 최신 날짜부터 최대 count일
+    List<InvestorFlow> investorFlows(String symbol, int count);
 }

@@ -2,6 +2,7 @@ package com.bongj9.briefing.adapter.toss;
 
 import com.bongj9.briefing.application.port.MarketData;
 import com.bongj9.briefing.domain.Candle;
+import com.bongj9.briefing.domain.InvestorFlow;
 import com.bongj9.briefing.domain.LastPrice;
 import com.bongj9.briefing.domain.Orderbook;
 import com.bongj9.briefing.domain.Trade;
@@ -16,6 +17,7 @@ import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -127,6 +129,20 @@ public class TossClient implements MarketData {
                 .toList();
     }
 
+    // 투자자별 매매동향 (국내만, 해외 티커는 400 unsupported-market). 최대 100일
+    @Override
+    public List<InvestorFlow> investorFlows(String symbol, int count) {
+        return call(token -> restClient.get()
+                .uri(u -> u.path("/api/v1/stocks/{symbol}/investor-trading").queryParam("count", count).build(symbol))
+                .header("Authorization", "Bearer " + token)
+                .retrieve()
+                .body(InvestorTradingResponse.class)
+                .result()
+                .records()).stream()
+                .map(TossInvestorRecord::toFlow)
+                .toList();
+    }
+
     // 다른 곳(curl 테스트 등)에서 토큰을 새로 받으면 기존 토큰이 무효가 되므로 401이면 한 번 재발급 후 재시도
     private <T> T call(Function<String, T> request) {
         try {
@@ -221,5 +237,33 @@ public class TossClient implements MarketData {
     }
 
     record TossTrade(String price, String volume, String timestamp, String currency) {
+    }
+
+    record InvestorTradingResponse(TossInvestorPage result) {
+    }
+
+    record TossInvestorPage(List<TossInvestorRecord> records, String nextUntil) {
+    }
+
+    // 매수·매도 수량도 오지만 화면엔 순매수만 쓴다. 기관 세부(breakdown)·CFD는 받지 않는다
+    record TossInvestorRecord(String date, TossNet individual, TossNet foreigner, TossNet institution,
+                              TossNet otherCorporation, TossHolding foreignerHolding) {
+
+        InvestorFlow toFlow() {
+            return new InvestorFlow(LocalDate.parse(date), TossNet.net(individual), TossNet.net(foreigner),
+                    TossNet.net(institution), TossNet.net(otherCorporation),
+                    foreignerHolding == null || foreignerHolding.holdingRate() == null ? null
+                            : new BigDecimal(foreignerHolding.holdingRate()));
+        }
+    }
+
+    record TossNet(String netBuyVolume) {
+
+        static Long net(TossNet n) {
+            return n == null || n.netBuyVolume() == null ? null : Long.valueOf(n.netBuyVolume());
+        }
+    }
+
+    record TossHolding(String holdingRate) {
     }
 }

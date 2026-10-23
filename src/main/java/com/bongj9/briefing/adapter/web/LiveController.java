@@ -3,6 +3,8 @@ package com.bongj9.briefing.adapter.web;
 import com.bongj9.briefing.application.CandleService;
 import com.bongj9.briefing.application.LiveFeed;
 import com.bongj9.briefing.application.port.MarketData;
+import com.bongj9.briefing.domain.FollowedStock;
+import com.bongj9.briefing.domain.InvestorFlow;
 import com.bongj9.briefing.domain.Orderbook;
 import com.bongj9.briefing.domain.Quote;
 import com.bongj9.briefing.domain.Trade;
@@ -54,6 +56,16 @@ class LiveController {
     List<Trade> trades(@RequestParam String symbol) {
         requireMarket();
         return market.trades(symbol.toUpperCase());
+    }
+
+    // 국내 종목 투자자별 순매수 (최근 10일, 최신순)
+    @GetMapping("/api/investors")
+    List<InvestorFlow> investors(@RequestParam String symbol) {
+        if (!FollowedStock.isKoreanCode(symbol)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "투자자별 매매동향은 국내 종목만 있습니다");
+        }
+        requireMarket();
+        return market.investorFlows(symbol, 10);
     }
 
     // 캔들 차트 초기 데이터 (오래된 순)
