@@ -92,6 +92,9 @@
   .badge.DISCLOSURE { background: var(--disc); }
   .badge.MOVE { background: #dc2626; }
   .badge.MARKET { background: #4f46e5; }
+  .badge.HIGH { background: #dc2626; }
+  .item .tip { margin-top: 6px; padding: 6px 10px; background: #fefce8; border-radius: 6px; color: #713f12; font-size: 13px; }
+  .minor-toggle { display: flex; align-items: center; gap: 6px; padding: 8px 6px; font-size: 13px; color: var(--muted); }
   .item.MOVE { background: #fff7ed; border-radius: 8px; cursor: pointer; }
   .item.MOVE .title { font-weight: 700; margin: 4px 0; }
   .item a { display: block; color: var(--text); text-decoration: none; font-weight: 600; margin: 4px 0; }
@@ -725,30 +728,33 @@
 
   // 종목 페이지 공시 탭: 최근 3개월 공시를 DART에서 2건 먼저, '더 보기'로 10건씩 더 받는다
   // 1분마다 도는 갱신에서 펼친 목록이 접히지 않도록 받은 것을 들고 있는다 (탭을 다시 누르면 새로 받음)
-  let disc = null; // { code, items, hasMore }
+  // 임원 지분 보고 같은 사소한 공시는 기본으로 숨긴다 (토글로 보기)
+  let disc = null; // { code, items, nextOffset }
+  let showMinor = false;
   async function loadDisclosures(more) {
     const code = selected.stockCode;
     const feed = document.getElementById('feed');
     if (!more && disc?.code === code) return renderDisclosures();
-    const offset = more ? disc.items.length : 0;
-    const res = await fetch(`/api/disclosures?stockCode=${code}&offset=${offset}&limit=${more ? 10 : 2}`);
+    const offset = more ? disc.nextOffset : 0;
+    const res = await fetch(`/api/disclosures?stockCode=${code}&offset=${offset}&limit=${more ? 10 : 2}&minor=${showMinor}`);
     if (selected?.stockCode !== code) return; // 받는 사이 다른 종목으로 이동
     if (!res.ok) {
       feed.replaceChildren(el('div', { className: 'empty', textContent: '공시를 불러오지 못했어요. (' + ((await res.json().catch(() => null))?.message ?? res.status) + ')' }));
       return;
     }
     const page = await res.json();
-    disc = { code, items: [...(more ? disc.items : []), ...page.items], hasMore: page.hasMore };
+    disc = { code, items: [...(more ? disc.items : []), ...page.items], nextOffset: page.nextOffset };
     renderDisclosures();
   }
   function renderDisclosures() {
     const feed = document.getElementById('feed');
-    if (!disc.items.length) {
-      feed.replaceChildren(el('div', { className: 'empty', textContent: '최근 3개월 동안 나온 공시가 없어요.' }));
-      return;
-    }
-    feed.replaceChildren(...disc.items.map(feedItem),
-      ...(disc.hasMore ? [el('button', { className: 'more', textContent: '공시 더 보기', onclick: e => { e.target.disabled = true; loadDisclosures(true); } })] : []));
+    const toggle = el('label', { className: 'minor-toggle' },
+      el('input', { type: 'checkbox', checked: showMinor, onchange: e => { showMinor = e.target.checked; disc = null; loadDisclosures(false); } }),
+      '사소한 공시도 보기 (임원 지분 보고, 증권 발행 서류 등)');
+    const list = disc.items.length ? disc.items.map(feedItem)
+      : [el('div', { className: 'empty', textContent: showMinor ? '최근 3개월 동안 나온 공시가 없어요.' : '최근 3개월 동안 눈여겨볼 공시가 없어요.' })];
+    feed.replaceChildren(toggle, ...list,
+      ...(disc.nextOffset != null ? [el('button', { className: 'more', textContent: '공시 더 보기', onclick: e => { e.target.disabled = true; loadDisclosures(true); } })] : []));
   }
 
   async function loadFeed() {
@@ -777,6 +783,7 @@
       },
       el('div', { className: 'meta' },
         el('span', { className: 'badge ' + i.type, textContent: LABEL[i.type] }),
+        ...(i.importance === 'HIGH' ? [el('span', { className: 'badge HIGH', textContent: '중요' })] : []),
         el('span', { textContent: i.stockName }),
         el('span', { textContent: i.source ?? '' }),
         // DART는 접수 시각을 주지 않아 공시는 날짜만
@@ -784,7 +791,8 @@
       i.url
         ? el('a', { href: i.url, target: '_blank', rel: 'noopener noreferrer', textContent: i.title })
         : el('div', { className: 'title', textContent: i.title }),
-      el('p', { textContent: i.summary }));
+      el('p', { textContent: i.summary }),
+      ...(i.tip ? [el('p', { className: 'tip', textContent: '볼 것: ' + i.tip })] : []));
   }
 
   // 주소로 화면을 정한다 (#/, #/stock/005930, #/industry/이름). 새로고침·뒤로가기·링크 공유가 된다

@@ -27,14 +27,15 @@ class FeedController {
         return feedService.feed(stockCode, industry, days);
     }
 
-    // GET /api/disclosures?stockCode=005930&offset=0&limit=2 (국내 종목, 최근 3개월, 최신순)
+    // GET /api/disclosures?stockCode=005930&offset=0&limit=2&minor=false (국내 종목, 최근 3개월, 최신순. minor=true면 사소한 공시도)
     @GetMapping("/api/disclosures")
     FeedService.DisclosureList disclosures(@RequestParam String stockCode,
                                            @RequestParam(defaultValue = "0") int offset,
-                                           @RequestParam(defaultValue = "10") int limit) {
+                                           @RequestParam(defaultValue = "10") int limit,
+                                           @RequestParam(defaultValue = "false") boolean minor) {
         if (!FollowedStock.isKoreanCode(stockCode) || offset < 0 || limit < 1 || limit > 100) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "국내 종목코드, offset ≥ 0, limit 1~100");
         }
-        return feedService.companyDisclosures(stockCode, offset, limit);
+        return feedService.companyDisclosures(stockCode, offset, limit, minor);
     }
 }
