@@ -1,6 +1,6 @@
 package com.bongj9.briefing.application;
 
-import com.bongj9.briefing.application.port.DisclosureSource;
+import com.bongj9.briefing.adapter.dart.DartClient;
 import com.bongj9.briefing.domain.Disclosure;
 import com.bongj9.briefing.domain.DisclosureItem;
 import com.bongj9.briefing.domain.DisclosureRepository;
@@ -13,13 +13,15 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest(properties = {"briefing.scheduling=false", "spring.datasource.url=jdbc:h2:mem:test"})
 class DisclosureCollectorTest {
 
     @MockitoBean
-    DisclosureSource source;
+    DartClient source; // EDGAR는 sec.contact가 없어 아무것도 받지 않는다
 
     @Autowired
     DisclosureCollector collector;
@@ -32,7 +34,7 @@ class DisclosureCollectorTest {
         LocalDate day = LocalDate.of(2026, 10, 21);
         DisclosureItem a = item("20261021000001", "005930");
         DisclosureItem b = item("20261021000002", "000660");
-        when(source.fetch(day)).thenReturn(List.of(a, b, a)); // 페이지 밀림으로 a가 두 번 옴
+        when(source.fetch(eq(day), any())).thenReturn(List.of(a, b, a)); // 페이지 밀림으로 a가 두 번 옴
 
         assertThat(collector.collect(day)).isEqualTo(2);
         assertThat(collector.collect(day)).isZero(); // 다음 주기에 같은 목록이 와도 저장 안 함
@@ -43,6 +45,6 @@ class DisclosureCollectorTest {
     }
 
     private DisclosureItem item(String rceptNo, String stockCode) {
-        return new DisclosureItem(rceptNo, "00000000", "회사", stockCode, "Y", "주요사항보고서", "회사", LocalDate.of(2026, 10, 21), "");
+        return new DisclosureItem(rceptNo, "00000000", "회사", stockCode, "Y", "주요사항보고서", "회사", LocalDate.of(2026, 10, 21), "", null, null);
     }
 }

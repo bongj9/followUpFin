@@ -6,6 +6,7 @@ import com.bongj9.briefing.domain.DisclosureRepository;
 import com.bongj9.briefing.domain.FollowedStockRepository;
 import com.bongj9.briefing.domain.NewsRepository;
 import com.bongj9.briefing.domain.PriceMoveRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -22,7 +23,12 @@ class FeedServiceTest {
 
     DisclosureSource source = mock(DisclosureSource.class);
     FeedService service = new FeedService(mock(FollowedStockRepository.class), mock(NewsRepository.class),
-            mock(DisclosureRepository.class), mock(PriceMoveRepository.class), source);
+            mock(DisclosureRepository.class), mock(PriceMoveRepository.class), List.of(source));
+
+    @BeforeEach
+    void setUp() {
+        when(source.supports("005930")).thenReturn(true);
+    }
 
     @Test
     void 공시_탭은_사소한_공시를_건너뛰고_이어_받을_위치를_돌려준다() {
@@ -48,6 +54,6 @@ class FeedServiceTest {
     }
 
     private static DisclosureItem item(String reportNm) {
-        return new DisclosureItem("1", "00126380", "삼성전자", "005930", "Y", reportNm, "삼성전자", LocalDate.of(2026, 10, 20), "");
+        return new DisclosureItem("1", "00126380", "삼성전자", "005930", "Y", reportNm, "삼성전자", LocalDate.of(2026, 10, 20), "", null, null);
     }
 }

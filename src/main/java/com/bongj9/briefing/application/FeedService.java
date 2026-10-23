@@ -33,12 +33,12 @@ public class FeedService {
     private final NewsRepository newsRepository;
     private final DisclosureRepository disclosureRepository;
     private final PriceMoveRepository priceMoveRepository;
-    private final DisclosureSource disclosureSource;
+    private final List<DisclosureSource> disclosureSources;
 
     public FeedService(FollowedStockRepository stockRepository, NewsRepository newsRepository,
                    DisclosureRepository disclosureRepository, PriceMoveRepository priceMoveRepository,
-                   DisclosureSource disclosureSource) {
-        this.disclosureSource = disclosureSource;
+                   List<DisclosureSource> disclosureSources) {
+        this.disclosureSources = disclosureSources;
         this.stockRepository = stockRepository;
         this.newsRepository = newsRepository;
         this.disclosureRepository = disclosureRepository;
@@ -66,10 +66,10 @@ public class FeedService {
         Stream<FeedItem> news = newsRepository.findByStockCodeInAndPublishedAtAfter(names.keySet(), since).stream()
                 .map(n -> new FeedItem("NEWS", n.getStockCode(), names.get(n.getStockCode()),
                         n.getSource(), n.getTitle(), n.getSummary(), n.getLink(), n.getPublishedAt()));
-        // ponytail: DART 목록엔 접수 시각이 없어 수집 시각으로 정렬. 첫 수집분은 모두 같은 시각
+        // ponytail: DART 목록엔 접수 시각이 없어 수집 시각으로 정렬. 첫 수집분은 모두 같은 시각 (SEC는 접수 시각)
         Stream<FeedItem> disclosures = disclosureRepository.findByStockCodeInAndRceptDtGreaterThanEqual(names.keySet(), sinceDate).stream()
                 .map(d -> FeedItem.disclosure(d.getStockCode(), names.get(d.getStockCode()), d.getReportNm(), d.getFlrNm(),
-                        d.getUrl(), d.getCollectedAt()))
+                        d.getUrl(), d.getAt()))
                 .filter(item -> !item.minor()); // 임원 지분 보고·펀드 서류 같은 사소한 공시는 피드에서 뺀다
 
         Stream<FeedItem> moves = priceMoveRepository.findByStockCodeInAndDetectedAtAfter(names.keySet(), since).stream()
@@ -88,21 +88,25 @@ public class FeedService {
                 .toList();
     }
 
-    // 종목 페이지 공시 탭: 최근 3개월 공시를 DART에서 바로 받는다 (저장하지 않음)
-    // minor가 false면 사소한 공시를 건너뛰고 limit건을 채운다. nextOffset은 DART 목록에서 이어 받을 위치 (없으면 null)
+    // 종목 페이지 공시 탭: 최근 3개월 공시를 출처(DART, EDGAR)에서 바로 받는다 (저장하지 않음)
+    // minor가 false면 사소한 공시를 건너뛰고 limit건을 채운다. nextOffset은 출처 목록에서 이어 받을 위치 (없으면 null)
     // ponytail: 남은 공시가 전부 사소한 것이어도 nextOffset이 남을 수 있다. 그때 '더 보기'는 빈 결과를 받고 사라진다
     public DisclosureList companyDisclosures(String stockCode, int offset, int limit, boolean minor) {
+        DisclosureSource source = disclosureSources.stream()
+                .filter(s -> s.supports(stockCode))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("이 종목의 공시 출처가 없어요 (미국 공시는 secret.yml의 sec.contact 필요)"));
         LocalDate today = LocalDate.now(SEOUL);
         List<FeedItem> items = new ArrayList<>();
         int next = offset;
         for (int pages = 0; pages < 5; pages++) { // DART 한 페이지 100건. 대형주 3개월치도 보통 몇백 건
-            DisclosureSource.Page page = disclosureSource.fetchCompany(stockCode, today.minusMonths(3), today, next, 100);
+            DisclosureSource.Page page = source.fetchCompany(stockCode, today.minusMonths(3), today, next, 100);
             for (int i = 0; i < page.items().size(); i++) {
                 DisclosureItem d = page.items().get(i);
                 next++;
                 // ponytail: DART 목록엔 접수 시각이 없어 접수일 0시로 둔다 (화면은 날짜만 표시)
                 FeedItem item = FeedItem.disclosure(d.stockCode(), d.corpName(), d.reportNm(), d.flrNm(), d.url(),
-                        d.rceptDt().atStartOfDay(SEOUL).toInstant());
+                        d.acceptedAt() != null ? d.acceptedAt() : d.rceptDt().atStartOfDay(SEOUL).toInstant());
                 if (minor || !item.minor()) {
                     items.add(item);
                 }
@@ -132,7 +136,8 @@ public class FeedService {
         static FeedItem disclosure(String stockCode, String stockName, String reportNm, String flrNm, String url, Instant at) {
             DisclosureGuide guide = DisclosureGuide.of(reportNm);
             String original = guide.name().equals(reportNm) ? "" : " · " + reportNm; // 바꾼 이름이면 원래 제목도 작게
-            return new FeedItem("DISCLOSURE", stockCode, stockName, "DART", guide.name(), flrNm + " 제출" + original,
+            String source = FollowedStock.isKoreanCode(stockCode) ? "DART" : "SEC";
+            return new FeedItem("DISCLOSURE", stockCode, stockName, source, guide.name(), flrNm + " 제출" + original,
                     url, at, guide.importance().name(), guide.tip());
         }
 

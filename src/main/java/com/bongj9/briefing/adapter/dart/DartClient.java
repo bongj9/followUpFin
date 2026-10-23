@@ -2,6 +2,7 @@ package com.bongj9.briefing.adapter.dart;
 
 import com.bongj9.briefing.application.port.DisclosureSource;
 import com.bongj9.briefing.domain.DisclosureItem;
+import com.bongj9.briefing.domain.FollowedStock;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -37,9 +38,14 @@ public class DartClient implements DisclosureSource {
         this.apiKey = apiKey;
     }
 
-    // 하루치 공시 전체를 마지막 페이지까지 받아온다
     @Override
-    public List<DisclosureItem> fetch(LocalDate date) {
+    public boolean supports(String stockCode) {
+        return FollowedStock.isKoreanCode(stockCode);
+    }
+
+    // 하루치 공시 전체를 마지막 페이지까지 받아온다 (팔로우 여부와 상관없이 시장 전체를 저장)
+    @Override
+    public List<DisclosureItem> fetch(LocalDate date, List<String> stockCodes) {
         String day = date.format(DateTimeFormatter.BASIC_ISO_DATE);
         List<DisclosureItem> items = new ArrayList<>();
         int page = 1;
@@ -170,7 +176,8 @@ public class DartClient implements DisclosureSource {
         DisclosureItem toDisclosureItem() {
             return new DisclosureItem(rceptNo, corpCode, corpName, stockCode, corpCls,
                     reportNm.strip().replaceAll("\\s+", " "), // DART가 공백을 여러 칸 붙여서 보냄
-                    flrNm, LocalDate.parse(rceptDt, DateTimeFormatter.BASIC_ISO_DATE), rm);
+                    flrNm, LocalDate.parse(rceptDt, DateTimeFormatter.BASIC_ISO_DATE), rm,
+                    "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=" + rceptNo, null); // DART 원문 뷰어
         }
     }
 }

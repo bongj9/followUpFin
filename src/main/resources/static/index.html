@@ -726,7 +726,7 @@
     }
   }
 
-  // 종목 페이지 공시 탭: 최근 3개월 공시를 DART에서 2건 먼저, '더 보기'로 10건씩 더 받는다
+  // 종목 페이지 공시 탭: 최근 3개월 공시를 DART(국내)·SEC(미국)에서 2건 먼저, '더 보기'로 10건씩 더 받는다
   // 1분마다 도는 갱신에서 펼친 목록이 접히지 않도록 받은 것을 들고 있는다 (탭을 다시 누르면 새로 받음)
   // 임원 지분 보고 같은 사소한 공시는 기본으로 숨긴다 (토글로 보기)
   let disc = null; // { code, items, nextOffset }
@@ -760,8 +760,7 @@
   async function loadFeed() {
     if (selected?.stockCode && feedType === 'DISCLOSURE') {
       document.getElementById('feedTitle').textContent = '최근 3개월 공시';
-      return isKoreanCode(selected.stockCode) ? loadDisclosures(false)
-        : document.getElementById('feed').replaceChildren(el('div', { className: 'empty', textContent: '공시(DART)는 국내 종목만 있어요.' }));
+      return loadDisclosures(false);
     }
     const q = selected?.stockCode ? '?stockCode=' + encodeURIComponent(selected.stockCode)
       : selected?.industry ? '?industry=' + encodeURIComponent(selected.industry) : '';
@@ -786,8 +785,8 @@
         ...(i.importance === 'HIGH' ? [el('span', { className: 'badge HIGH', textContent: '중요' })] : []),
         el('span', { textContent: i.stockName }),
         el('span', { textContent: i.source ?? '' }),
-        // DART는 접수 시각을 주지 않아 공시는 날짜만
-        el('span', { textContent: new Date(i.at).toLocaleString('ko-KR', i.type === 'DISCLOSURE' ? { month: 'numeric', day: 'numeric' } : { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) })),
+        // DART는 접수 시각을 주지 않아 날짜만 (SEC는 초 단위 접수 시각이 있어 시각까지)
+        el('span', { textContent: new Date(i.at).toLocaleString('ko-KR', i.source === 'DART' ? { month: 'numeric', day: 'numeric' } : { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) })),
       i.url
         ? el('a', { href: i.url, target: '_blank', rel: 'noopener noreferrer', textContent: i.title })
         : el('div', { className: 'title', textContent: i.title }),

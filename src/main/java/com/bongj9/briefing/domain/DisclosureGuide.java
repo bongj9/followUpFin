@@ -2,7 +2,7 @@ package com.bongj9.briefing.domain;
 
 import java.util.List;
 
-// DART 공시 제목을 쉬운 이름·중요도·"여기를 보세요" 안내로 바꾼다
+// DART·SEC 공시 제목을 쉬운 이름·중요도·"여기를 보세요" 안내로 바꾼다
 // 위에서부터 처음 맞는 규칙을 쓴다 (제목 앞의 [기재정정] 같은 표시는 무시)
 // ponytail: 제목 글자로만 고른다. 규칙에 없는 공시는 원래 제목 그대로 중간 중요도로 둔다
 public record DisclosureGuide(String name, Importance importance, String tip) {
@@ -10,6 +10,10 @@ public record DisclosureGuide(String name, Importance importance, String tip) {
     public enum Importance { HIGH, MID, LOW }
 
     private record Rule(String keyword, String name, Importance importance, String tip) {
+
+        DisclosureGuide guide() {
+            return new DisclosureGuide(name, importance, tip);
+        }
     }
 
     private static final List<Rule> RULES = List.of(
@@ -69,11 +73,64 @@ public record DisclosureGuide(String name, Importance importance, String tip) {
             new Rule("특수관계인", "계열사·특수관계인 거래", Importance.LOW, null),
             new Rule("출자계열회사", "계열사 거래", Importance.LOW, null));
 
+    // SEC 공시는 "양식 8-K 항목들"을 띄어 쓴 제목(8-K 2.02 9.01)으로 저장한다. 낱말이 같아야 맞는다
+    // 8-K 항목이 먼저(중요한 순), 그다음 양식. 9.01(첨부 서류)은 거의 늘 붙어 있어 규칙에 없다
+    private static final List<Rule> SEC_RULES = List.of(
+            new Rule("1.03", "파산·회생 신청", Importance.HIGH, "회사가 파산이나 회생 절차에 들어갔습니다. 매우 큰 악재입니다."),
+            new Rule("3.01", "상장폐지 경고·상장 이전", Importance.HIGH, "거래소 상장 기준을 못 맞췄거나 상장을 옮깁니다. 사유를 꼭 확인하세요."),
+            new Rule("4.02", "과거 재무제표 정정", Importance.HIGH, "이전에 낸 재무제표를 믿을 수 없다고 회사가 밝혔습니다. 보통 큰 악재입니다."),
+            new Rule("2.02", "실적 발표", Importance.HIGH, "매출·주당순이익(EPS)이 시장 예상보다 좋은지, 다음 분기 전망(가이던스)을 올렸는지 보세요."),
+            new Rule("5.01", "회사 지배권 변경", Importance.HIGH, "회사의 주인이 바뀝니다. 누가 얼마에 사는지 보세요."),
+            new Rule("1.01", "중요 계약 체결", Importance.HIGH, "인수·공급·대출 같은 큰 계약입니다. 금액과 상대방을 보세요."),
+            new Rule("1.02", "중요 계약 해지", Importance.HIGH, "큰 계약이 끝났습니다. 매출에 얼마나 영향이 있는지 보세요."),
+            new Rule("2.01", "인수·매각 완료", Importance.HIGH, "회사나 자산을 사거나 판 거래를 마쳤습니다. 금액을 보세요."),
+            new Rule("2.05", "구조조정", Importance.HIGH, "감원이나 사업 정리 계획입니다. 드는 비용과 아끼는 비용을 보세요."),
+            new Rule("2.06", "자산 손상 처리", Importance.HIGH, "자산 가치를 깎아 손실로 잡습니다. 금액이 클수록 악재입니다."),
+            new Rule("2.03", "대규모 차입", Importance.MID, "새로 빚을 냈습니다. 금액과 금리를 보세요."),
+            new Rule("3.02", "신주 발행(비공개)", Importance.MID, "새 주식을 찍었습니다. 주식 수가 얼마나 늘었는지 보세요."),
+            new Rule("5.02", "임원·이사 변경", Importance.MID, "CEO·CFO가 바뀌면 크게 볼 일입니다. 누가 왜 떠나는지 보세요."),
+            new Rule("7.01", "투자자 공개 자료", Importance.MID, "투자자 설명 자료를 공개했습니다. 전망 숫자가 있는지 보세요."),
+            new Rule("8.01", "기타 주요 사항", Importance.MID, "회사가 중요하다고 본 그 밖의 일입니다. 본문을 열어 보세요."),
+            new Rule("5.03", "정관 변경", Importance.LOW, null),
+            new Rule("5.07", "주주총회 투표 결과", Importance.LOW, null),
+            new Rule("10-K", "연간 보고서 (10-K)", Importance.MID, "1년 실적과 사업 위험을 정리한 보고서입니다. 핵심 숫자는 보통 실적 발표(8-K)로 먼저 나옵니다."),
+            new Rule("10-Q", "분기 보고서 (10-Q)", Importance.MID, "분기 실적 정리입니다. 핵심 숫자는 보통 실적 발표(8-K)로 먼저 나옵니다."),
+            new Rule("20-F", "연간 보고서 (해외 기업)", Importance.MID, "미국 밖 회사의 1년 실적 보고서입니다."),
+            new Rule("6-K", "수시 보고 (해외 기업)", Importance.MID, "미국 밖 회사의 수시 공시입니다. 실적 발표인 경우가 많습니다."),
+            new Rule("8-K", "수시 공시 (8-K)", Importance.MID, null),
+            new Rule("25-NSE", "상장폐지", Importance.HIGH, "거래소에서 상장이 폐지됩니다. 매우 큰 악재일 수 있습니다."),
+            new Rule("15-12B", "SEC 등록 해지", Importance.HIGH, "공시 의무를 끝내려는 신청입니다. 보통 상장폐지와 함께 옵니다."),
+            new Rule("13D", "5% 이상 지분 취득 (경영 참여)", Importance.MID, "누가 5% 넘게 샀고 경영에 목소리를 내려는지 보세요."),
+            new Rule("13G", "5% 이상 지분 보유 (단순 투자)", Importance.LOW, null),
+            new Rule("4", "임원·대주주 주식 거래", Importance.LOW, null),
+            new Rule("3", "임원·대주주 첫 지분 보고", Importance.LOW, null),
+            new Rule("5", "임원·대주주 연간 거래 보고", Importance.LOW, null),
+            new Rule("144", "임원·대주주 매도 예정 신고", Importance.LOW, null),
+            new Rule("14A", "주주총회 안건 (위임장)", Importance.LOW, null),
+            new Rule("DEFA14A", "주주총회 추가 자료", Importance.LOW, null),
+            new Rule("S-8", "임직원 주식 보상 등록", Importance.LOW, null),
+            new Rule("S-3", "증권 발행 등록", Importance.LOW, null),
+            new Rule("S-3ASR", "증권 발행 등록", Importance.LOW, null),
+            new Rule("424B2", "증권 발행 서류", Importance.LOW, null),
+            new Rule("424B3", "증권 발행 서류", Importance.LOW, null),
+            new Rule("424B5", "증권 발행 서류", Importance.LOW, null),
+            new Rule("FWP", "증권 발행 서류", Importance.LOW, null),
+            new Rule("11-K", "임직원 연금 보고", Importance.LOW, null),
+            new Rule("SD", "분쟁 광물 보고", Importance.LOW, null),
+            new Rule("13F-HR", "회사가 가진 다른 주식 보고", Importance.LOW, null), // 투자 포트폴리오. 이 회사 주가와는 거의 무관
+            new Rule("N-PX", "의결권 행사 기록", Importance.LOW, null));
+
     public static DisclosureGuide of(String reportNm) {
         String title = reportNm.replaceFirst("^\\[[^]]*\\]", "");
         for (Rule rule : RULES) {
             if (title.contains(rule.keyword())) {
-                return new DisclosureGuide(rule.name(), rule.importance(), rule.tip());
+                return rule.guide();
+            }
+        }
+        List<String> words = List.of(title.replace("/A", "").split(" ")); // 정정(10-K/A)은 원래 양식과 같게 본다
+        for (Rule rule : SEC_RULES) {
+            if (words.contains(rule.keyword())) {
+                return rule.guide();
             }
         }
         return new DisclosureGuide(title, Importance.MID, null);
