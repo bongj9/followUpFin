@@ -122,10 +122,15 @@
   #legend .chip.off span { opacity: 0.35; }
   #measure { position: absolute; z-index: 4; font-size: 12px; font-weight: 700; background: #fff; border: 1px solid currentColor; border-radius: 6px; padding: 2px 6px; pointer-events: none; white-space: nowrap; }
   #measure[hidden] { display: none; }
-  #legend .row.note { font-weight: 700; }
   #toolbar .menu label button { margin-left: auto; padding: 1px 7px; font-size: 12px; color: var(--muted); background: var(--bg); }
   #legend .chip { display: inline-flex; gap: 4px; align-items: center; margin-right: 6px; }
   #legend .chip .name { pointer-events: auto; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+  #tip { position: absolute; z-index: 5; pointer-events: none; max-width: 280px; background: var(--card); border: 1px solid var(--line); border-top: 3px solid currentColor; border-radius: 8px; padding: 8px 10px; font-size: 12px; line-height: 1.5; box-shadow: 0 6px 20px rgba(0,0,0,0.12); }
+  #tip[hidden] { display: none; }
+  #tip .when { color: var(--muted); font-size: 11px; }
+  #tip b { display: block; font-size: 13px; }
+  #tip p { margin: 2px 0 0; color: var(--text); }
+  #tip p + p { border-top: 1px dashed var(--line); padding-top: 4px; margin-top: 4px; }
   #guide { margin: 0 14px 4px; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; font-size: 13px; line-height: 1.6; background: #fafbfc; }
   #guide[hidden] { display: none; }
   #guide .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
@@ -169,7 +174,7 @@
   </aside>
   <div id="head"></div>
   <section id="chartSection">
-    <div id="chartBox" hidden><div id="toolbar"></div><div id="chartWrap"><div id="legend"></div><div id="measure" hidden></div><div id="chart"></div></div><div id="guide" hidden></div><div id="status"></div></div>
+    <div id="chartBox" hidden><div id="toolbar"></div><div id="chartWrap"><div id="legend"></div><div id="measure" hidden></div><div id="tip" hidden></div><div id="chart"></div></div><div id="guide" hidden></div><div id="status"></div></div>
   </section>
   <div id="below">
     <section id="investorBox" hidden><h2>투자자별 순매수 <span id="holding"></span></h2><div id="investors"></div></section>
@@ -421,13 +426,36 @@
         el('b', { textContent: date(guideFocus.time) + ' ' + guideFocus.text }), el('div', { textContent: guideFocus.note, style: 'color:var(--text)' }))] : []),
       el('div', { className: 'src', textContent: '출처: ' + g.src + ' · 판단을 돕는 참고 정보이고 매매 신호가 아니에요' }));
   }
+  // 표시가 있는 봉에 커서를 대면 그 옆에 말풍선 (오른쪽에 자리가 없으면 왼쪽)
+  function showTip(v, p) {
+    const box = document.getElementById('tip');
+    const marks = p.time == null || !p.point ? [] : (v.signals ?? []).filter(s => s.time === p.time);
+    box.hidden = !marks.length;
+    if (!marks.length) return;
+    const bar = v.bars.find(b => b.time === p.time);
+    const y = v.main.priceToCoordinate(marks[0].position === 'aboveBar' ? bar.high : bar.low) ?? p.point.y;
+    const date = new Date((p.time - KST) * 1000).toLocaleString('ko-KR', BUCKET[v.interval]
+      ? { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' } : { year: 'numeric', month: 'numeric', day: 'numeric' });
+    box.style.color = marks[0].color;
+    box.replaceChildren(el('div', { className: 'when', textContent: date }),
+      ...marks.map(s => el('p', {}, el('b', {}, ICON[s.shape] + ' ' + s.text), s.note)));
+    const chartEl = document.getElementById('chart');
+    const right = p.point.x + 20, fits = right + box.offsetWidth < chartEl.clientWidth - 70; // 70: 가격 눈금
+    box.style.left = (fits ? right : Math.max(4, p.point.x - box.offsetWidth - 20)) + 'px';
+    box.style.top = Math.max(4, Math.min(y - box.offsetHeight / 2, MAIN_HEIGHT - box.offsetHeight - 4)) + 'px';
+  }
+
   // 신호 자리로 차트를 옮기고 그 봉에 십자선을 둔다
   function focusSignal(v, s) {
     guideFocus = s;
     const i = v.bars.findIndex(b => b.time === s.time);
     v.chart.timeScale().setVisibleLogicalRange({ from: i - 60, to: i + 20 });
     // 범위 이동은 다음 화면에 반영되고 십자선은 화면 좌표로 남아서, 이동이 끝난 뒤에 둔다
-    requestAnimationFrame(() => requestAnimationFrame(() => v.chart.setCrosshairPosition(v.bars[i].close, s.time, v.main)));
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      v.chart.setCrosshairPosition(v.bars[i].close, s.time, v.main);
+      // 코드로 옮긴 십자선은 커서 위치를 주지 않아서 말풍선 자리를 직접 잡는다
+      showTip(v, { time: s.time, point: { x: v.chart.timeScale().timeToCoordinate(s.time), y: v.main.priceToCoordinate(v.bars[i].close) } });
+    }));
     renderGuide(v);
   }
 
@@ -607,8 +635,6 @@
         ...ind.lines.filter(l => l.label).map(l => colored(String(l.label), l.color)));
     });
     if (chips.length) rows.push(el('div', { className: 'row' }, ...chips));
-    const marks = (v.signals ?? []).filter(s => s.time === bar.time);
-    if (marks.length) rows.push(el('div', { className: 'row note' }, ...marks.map(s => colored(ICON[s.shape] + ' ' + s.text, s.color))));
     for (const c of v.compares) {
       rows.push(el('div', { className: 'row' }, btn('×', () => toggleCompare(c.code), false, '비교 해제'), colored('비교 ' + c.code + ' (%)', c.color)));
     }
@@ -671,6 +697,7 @@
     chart.panes().forEach((p, i) => p.setStretchFactor(i === 0 ? MAIN_HEIGHT : PANE_HEIGHT));
     const v = view = { code, interval, type, chart, main, plots, inds, bars: [], compares: [], hover: false };
     chart.subscribeCrosshairMove(p => {
+      showTip(v, p);
       v.hover = p.time != null;
       renderLegend(v, (p.time != null && v.bars.find(b => b.time === p.time)) || v.bars.at(-1));
     });
