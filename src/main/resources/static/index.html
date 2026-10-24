@@ -578,8 +578,7 @@
   const TABS = [['NEWS', '뉴스'], ['DISCLOSURE', '공시'], ['MOVE', '급등락'], ['MARKET', '시장']];
   let feedType = 'NEWS';
   function renderTabs() {
-    if (selected && feedType === 'MARKET') feedType = 'NEWS'; // 시장 탭은 홈에만
-    document.getElementById('tabs').replaceChildren(...TABS.filter(([type]) => !selected || type !== 'MARKET').map(([type, label]) =>
+    document.getElementById('tabs').replaceChildren(...TABS.map(([type, label]) =>
       el('button', { textContent: label, className: type === feedType ? 'active' : '', onclick: () => { feedType = type; disc = null; renderTabs(); loadFeed(); } })));
   }
 
@@ -774,7 +773,8 @@
       document.getElementById('feedTitle').textContent = '최근 3개월 공시';
       return loadDisclosures(false);
     }
-    const q = selected?.stockCode ? '?stockCode=' + encodeURIComponent(selected.stockCode)
+    // 시장 뉴스는 종목과 상관없어서 종목·업종 화면에서도 홈과 같은 목록을 받는다
+    const q = feedType === 'MARKET' ? '' : selected?.stockCode ? '?stockCode=' + encodeURIComponent(selected.stockCode)
       : selected?.industry ? '?industry=' + encodeURIComponent(selected.industry) : '';
     const items = (await (await fetch('/api/feed' + q)).json()).filter(i => feedType ? i.type === feedType : i.type !== 'MARKET'); // 시장 뉴스는 시장 탭에서만
     document.getElementById('feedTitle').textContent = selected?.stockCode ? '뉴스·공시' : selected ? selected.label + ' 뉴스·공시' : '전체 뉴스·공시';
