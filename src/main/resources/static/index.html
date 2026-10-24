@@ -119,10 +119,30 @@
   #legend { position: absolute; top: 4px; left: 6px; z-index: 3; pointer-events: none; font-size: 12px; display: flex; flex-direction: column; gap: 3px; }
   #legend .row { display: flex; gap: 6px; align-items: center; background: rgba(255,255,255,0.85); padding: 1px 4px; border-radius: 4px; width: fit-content; }
   #legend .row button { pointer-events: auto; border: 0; background: #f1f3f5; border-radius: 4px; width: 18px; height: 18px; font-size: 11px; line-height: 18px; cursor: pointer; color: var(--muted); padding: 0; }
-  #legend .row.off span { opacity: 0.35; }
+  #legend .chip.off span { opacity: 0.35; }
   #measure { position: absolute; z-index: 4; font-size: 12px; font-weight: 700; background: #fff; border: 1px solid currentColor; border-radius: 6px; padding: 2px 6px; pointer-events: none; white-space: nowrap; }
   #measure[hidden] { display: none; }
-  #legend .row.note { color: var(--muted); }
+  #legend .row.note { font-weight: 700; }
+  #toolbar .menu label button { margin-left: auto; padding: 1px 7px; font-size: 12px; color: var(--muted); background: var(--bg); }
+  #legend .chip { display: inline-flex; gap: 4px; align-items: center; margin-right: 6px; }
+  #legend .chip .name { pointer-events: auto; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+  #guide { margin: 0 14px 4px; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; font-size: 13px; line-height: 1.6; background: #fafbfc; }
+  #guide[hidden] { display: none; }
+  #guide .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  #guide h3 { margin: 0; font-size: 15px; }
+  #guide .close { border: 0; background: none; font-size: 18px; cursor: pointer; color: var(--muted); }
+  #guide .what { margin: 4px 0 10px; color: var(--muted); }
+  #guide .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  #guide h4 { margin: 0 0 4px; font-size: 12px; color: var(--muted); font-weight: 600; }
+  #guide ul { margin: 0; padding-left: 18px; }
+  #guide .sig { display: flex; gap: 8px; align-items: baseline; }
+  #guide .icon { font-size: 14px; width: 16px; text-align: center; flex: none; }
+  #guide .caution { margin-top: 10px; padding: 8px 10px; background: #fff7ed; border-radius: 8px; color: #9a3412; }
+  #guide .recent { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 6px; }
+  #guide .recent button { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 3px 10px; font-size: 12px; cursor: pointer; font-family: inherit; }
+  #guide .recent button.on { border-color: #111827; font-weight: 700; }
+  #guide .focus { margin-top: 8px; padding: 8px 10px; background: var(--card); border-left: 3px solid currentColor; border-radius: 4px; }
+  #guide .src { margin-top: 8px; font-size: 11px; color: var(--muted); }
   #status { padding: 10px 14px; border-top: 1px solid #f1f3f5; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
   #status:empty { display: none; }
   #status .why { color: var(--muted); }
@@ -149,7 +169,7 @@
   </aside>
   <div id="head"></div>
   <section id="chartSection">
-    <div id="chartBox" hidden><div id="toolbar"></div><div id="chartWrap"><div id="legend"></div><div id="measure" hidden></div><div id="chart"></div></div><div id="status"></div></div>
+    <div id="chartBox" hidden><div id="toolbar"></div><div id="chartWrap"><div id="legend"></div><div id="measure" hidden></div><div id="chart"></div></div><div id="guide" hidden></div><div id="status"></div></div>
   </section>
   <div id="below">
     <section id="investorBox" hidden><h2>투자자별 순매수 <span id="holding"></span></h2><div id="investors"></div></section>
@@ -278,39 +298,137 @@
   ];
 
   // 판단 재료: 지표에서 눈여겨볼 순간을 찾아 봉 위에 표시한다. 사라·팔아라가 아니라 '이런 일이 있었다'만 알린다
-  // 켜 둔 지표만 본다. 결과는 { time, position, shape, color, text, note } (note는 마우스를 올리면 범례에 나오는 설명)
+  // 켜 둔 지표만 본다. 결과는 { key(지표), time, position, shape, color, text(짧은 이름), note(설명) }
+  const ICON = { arrowUp: '▲', arrowDown: '▼', circle: '●', square: '■' };
+  const PURPLE = '#8b5cf6', AMBER = '#f59e0b';
   function signals(bars, on) {
     const c = closes(bars), out = [];
-    const mark = (i, up, shape, text, note) => out.push({ time: bars[i].time, position: up ? 'belowBar' : 'aboveBar',
-      shape, color: up ? UP : DOWN, text, note });
+    const mark = (key, i, position, shape, color, text, note) => out.push({ key, time: bars[i].time, position, shape, color, text, note });
+    const golden = (key, i, text, note) => mark(key, i, 'belowBar', 'arrowUp', UP, text, note);
+    const dead = (key, i, text, note) => mark(key, i, 'aboveBar', 'arrowDown', DOWN, text, note);
+    // a가 b를 위로 뚫으면 양수, 아래로 뚫으면 음수
     const crossed = (a, b, i) => a[i - 1] != null && b[i - 1] != null && a[i] != null && b[i] != null
       ? Math.sign(a[i] - b[i]) - Math.sign(a[i - 1] - b[i - 1]) : 0;
+    const level = (vals, n) => vals.map(v => v == null ? null : n);
+    const each = f => { for (let i = 1; i < bars.length; i++) f(i); };
     if (on.includes('ma')) {
       for (const [f, l] of [[5, 20], [20, 60]]) {
         const fast = sma(c, f), slow = sma(c, l);
-        for (let i = 1; i < bars.length; i++) {
+        each(i => {
           const d = crossed(fast, slow, i);
-          if (d > 0) mark(i, true, 'arrowUp', '골든 ' + f + '·' + l, `${f}선이 ${l}선을 위로 뚫음 (골든크로스): 단기 흐름이 더 길게 본 흐름보다 강해졌다는 뜻. 횡보장에선 자주 속는다`);
-          if (d < 0) mark(i, false, 'arrowDown', '데드 ' + f + '·' + l, `${f}선이 ${l}선을 아래로 뚫음 (데드크로스): 단기 흐름이 약해졌다는 뜻. 이미 많이 내린 뒤에 늦게 나오기도 한다`);
-        }
+          if (d > 0) golden('ma', i, `골든크로스 ${f}·${l}`, `${f}선이 ${l}선을 위로 뚫음: 짧게 본 흐름이 길게 본 흐름보다 강해졌다. 옆으로 기는 장에선 자주 속는다`);
+          if (d < 0) dead('ma', i, `데드크로스 ${f}·${l}`, `${f}선이 ${l}선을 아래로 뚫음: 짧게 본 흐름이 약해졌다. 이미 많이 내린 뒤 늦게 나오기도 한다`);
+        });
       }
     }
     if (on.includes('bb')) {
       const mid = sma(c, 20), up = bollinger(c, 20, 1), lo = bollinger(c, 20, -1);
       const width = mid.map((m, i) => m == null ? null : (up[i] - lo[i]) / m);
       let squeezed = false;
-      for (let i = 1; i < bars.length; i++) {
-        if (crossed(c, up, i) > 0) mark(i, false, 'circle', '상단 돌파', '종가가 볼린저 상단 위로: 평소보다 크게 오름. 과열로 볼 수도, 강한 추세의 시작으로 볼 수도 있다 (거래량과 같이 볼 것)');
-        if (crossed(c, lo, i) < 0) mark(i, true, 'circle', '하단 이탈', '종가가 볼린저 하단 아래로: 평소보다 크게 내림. 반등 자리일 수도, 하락이 이어질 수도 있다');
-        // 스퀴즈: 밴드 폭이 최근 120봉 중 가장 좁을 때 (큰 움직임 전에 자주 나오지만 방향은 알려주지 않는다)
+      each(i => {
+        if (crossed(c, up, i) > 0) mark('bb', i, 'aboveBar', 'circle', UP, '상단 돌파', '종가가 볼린저 상단 위로: 평소보다 크게 오름. 과열일 수도, 강한 추세의 시작일 수도 있다 (거래량과 같이 볼 것)');
+        if (crossed(c, lo, i) < 0) mark('bb', i, 'belowBar', 'circle', DOWN, '하단 이탈', '종가가 볼린저 하단 아래로: 평소보다 크게 내림. 반등 자리일 수도, 하락이 이어질 수도 있다');
+        // 스퀴즈: 밴드 폭이 최근 120봉 중 가장 좁을 때 (처음 좁아진 봉에만 표시)
         const recent = width.slice(Math.max(0, i - 119), i + 1).filter(w => w != null);
         const now = recent.length >= 120 && width[i] <= Math.min(...recent);
-        if (now && !squeezed) out.push({ time: bars[i].time, position: 'aboveBar', shape: 'square', color: '#f59e0b', text: '스퀴즈',
-          note: '볼린저 밴드 폭이 최근 120봉 중 가장 좁음 (스퀴즈): 움직임이 잦아든 상태. 이후 크게 움직이는 일이 많지만 방향은 모른다' });
+        if (now && !squeezed) mark('bb', i, 'aboveBar', 'square', AMBER, '스퀴즈', '밴드 폭이 최근 120봉 중 가장 좁음: 움직임이 잦아든 상태. 이후 크게 움직이는 일이 많지만 방향은 모른다');
         squeezed = now;
-      }
+      });
+    }
+    if (on.includes('ichimoku')) {
+      const t = midRange(bars, 9), k = midRange(bars, 26);
+      each(i => {
+        const d = crossed(t, k, i);
+        if (d > 0) golden('ichimoku', i, '호전', '전환선이 기준선을 위로 뚫음 (호전): 단기 흐름이 좋아졌다. 구름 위에서 나오면 더 강하게 본다');
+        if (d < 0) dead('ichimoku', i, '역전', '전환선이 기준선을 아래로 뚫음 (역전): 단기 흐름이 나빠졌다. 구름 아래에서 나오면 더 약하게 본다');
+      });
+    }
+    if (on.includes('volume')) {
+      const vol = bars.map(b => b.volume), avg = sma(vol, 20);
+      const surge = i => avg[i - 1] != null && vol[i] >= 2 * avg[i - 1];
+      each(i => {
+        if (surge(i) && !surge(i - 1)) mark('volume', i, 'belowBar', 'square', PURPLE, '거래량 급증',
+          `거래량이 20봉 평균의 ${(vol[i] / avg[i - 1]).toFixed(1)}배: 관심이 크게 몰림. 이 봉이 오른 봉인지 내린 봉인지가 중요하다`);
+      });
+    }
+    if (on.includes('rsi')) {
+      const r = rsi(c);
+      each(i => {
+        if (crossed(r, level(r, 70), i) > 0) mark('rsi', i, 'aboveBar', 'circle', UP, 'RSI 70 진입', 'RSI가 70 위로 (과매수): 최근 오른 힘이 강함. 강세장에선 여기 오래 머물기도 한다');
+        if (crossed(r, level(r, 30), i) < 0) mark('rsi', i, 'belowBar', 'circle', DOWN, 'RSI 30 진입', 'RSI가 30 아래로 (과매도): 최근 내린 힘이 강함. 하락장에선 여기 오래 머물기도 한다');
+      });
+    }
+    if (on.includes('macd')) {
+      const m = macd(c), sig = macdSignal(c);
+      each(i => {
+        const d = crossed(m, sig, i);
+        if (d > 0) golden('macd', i, 'MACD 골든', 'MACD가 시그널을 위로 뚫음: 오르는 힘이 커지기 시작. 0선 아래에서 나오면 반등, 위에서 나오면 추세가 이어지는 쪽으로 본다');
+        if (d < 0) dead('macd', i, 'MACD 데드', 'MACD가 시그널을 아래로 뚫음: 오르는 힘이 줄기 시작');
+      });
     }
     return out.sort((a, b) => a.time - b.time);
+  }
+
+  // 보는 법 (지표 이름이나 메뉴의 '보는 법'을 누르면 차트 아래에 펼친다)
+  const GUIDES = {
+    ma: { what: '최근 N개 봉 종가의 평균을 이은 선. 5·20은 짧은 흐름, 60·120은 긴 흐름.',
+      read: ['가격이 선 위면 그 기간에 산 사람들이 평균적으로 이익인 상태', '정배열(5>20>60>120)은 상승 추세, 역배열은 하락 추세', '상승 추세에선 20선 근처까지 내려왔다 다시 오르는 눌림이 자주 나온다'],
+      caution: '평균이라 늦게 반응한다. 옆으로 기는 장에선 크로스가 자주 나왔다 사라진다(휩쏘).', src: '그랜빌 8법칙 (Granville, 1976)' },
+    bb: { what: '20봉 평균선 위아래로 표준편차 2배만큼 띄운 띠. 가격은 대부분 이 띠 안에서 움직인다.',
+      read: ['상단 근처는 평소보다 많이 오른 자리, 하단 근처는 많이 내린 자리', '띠가 좁아지면(스퀴즈) 쉬던 가격이 곧 크게 움직이는 일이 많다', '강한 추세에선 상단(하단)을 타고 계속 움직인다 (밴드 워킹)'],
+      caution: '상단을 넘었다고 바로 팔 신호가 아니다. RSI·거래량과 같이 보라고 만든 사람이 권한다.', src: 'Bollinger on Bollinger Bands (2001)' },
+    ichimoku: { what: '구름(빨강·파랑 선행스팬 사이)이 지지·저항 역할을 한다. 주황 전환선(9봉), 초록 기준선(26봉), 회색 후행스팬.',
+      read: ['가격이 구름 위면 상승 추세, 아래면 하락 추세, 안이면 방향을 찾는 중', '전환선이 기준선 위로 올라가면 호전, 아래로 내려가면 역전', '구름이 두꺼울수록 뚫기 어렵다'],
+      caution: '선이 많아 복잡하다. 처음엔 가격이 구름 위인지 아래인지만 봐도 충분하다.', src: '호소다 고이치 (1969 공개)' },
+    volume: { what: '그 봉 동안 거래된 주식 수. 빨강은 오른 봉, 파랑은 내린 봉, 주황선은 20봉 평균.',
+      read: ['가격이 움직일 때 거래량이 실리면 믿을 만하다', '거래량 없이 나온 돌파는 실패하기 쉽다', '바닥에서 거래량이 크게 터지면 주인이 바뀌는 신호로 보기도 한다'],
+      caution: '분봉의 마지막 봉은 아직 거래가 덜 쌓여서 작게 보인다.', src: 'Edwards & Magee, Technical Analysis of Stock Trends (1948)' },
+    rsi: { what: '최근 14봉 동안 오른 폭과 내린 폭을 비교한 값 (0~100). 50보다 크면 오른 힘이 더 컸다.',
+      read: ['70 이상은 과매수, 30 이하는 과매도 (아래 칸 점선)', '가격은 신고가인데 RSI는 낮아지면(다이버전스) 오르는 힘이 약해졌다는 신호', '50 위면 상승 쪽 힘이 우세'],
+      caution: '강세장에선 70 위에 오래 머문다. 70을 넘었다고 바로 팔면 큰 상승을 놓칠 수 있다.', src: 'Wilder, New Concepts in Technical Trading Systems (1978)' },
+    macd: { what: '12봉·26봉 지수이동평균의 차이(파랑)와 그 9봉 평균(시그널, 주황). 막대는 둘의 차이.',
+      read: ['MACD가 시그널 위로 올라가면 오르는 힘이 커지는 중', '0선(점선) 위면 큰 흐름이 상승, 아래면 하락', '막대가 줄어들면 지금 방향의 힘이 빠지는 중'],
+      caution: '이동평균으로 만들어서 늦다. 옆으로 기는 장에선 교차가 잦다.', src: 'Gerald Appel (1970년대)' },
+  };
+  let guideKey = null, guideFocus = null; // 펼친 지표, 고른 신호
+  function openGuide(key) { guideKey = guideKey === key ? null : key; guideFocus = null; menu = null; renderToolbar(); renderGuide(view); }
+  function renderGuide(v) {
+    const box = document.getElementById('guide');
+    const ind = INDICATORS.find(i => i.key === guideKey), g = GUIDES[guideKey];
+    box.hidden = !ind || !v;
+    if (box.hidden) return box.replaceChildren();
+    const mine = (v.signals ?? []).filter(s => s.key === guideKey);
+    const kinds = [...new Map(mine.map(s => [s.text, s])).values()];
+    const date = t => new Date((t - KST) * 1000).toLocaleString('ko-KR', BUCKET[v.interval]
+      ? { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' } : { year: '2-digit', month: 'numeric', day: 'numeric' });
+    const icon = s => colored(ICON[s.shape], s.color);
+    const off = !v.inds?.includes(ind) ? [el('div', { className: 'caution', style: 'background:#eff6ff;color:#1e40af', textContent: '이 지표는 꺼져 있어요. 켜면 차트에 신호가 표시돼요.' })] : [];
+    box.replaceChildren(
+      el('div', { className: 'top' }, el('h3', { textContent: ind.name + ' 보는 법' }),
+        el('button', { className: 'close', textContent: '×', title: '닫기', onclick: () => openGuide(guideKey) })),
+      el('p', { className: 'what', textContent: g.what }),
+      ...off,
+      el('div', { className: 'cols' },
+        el('div', {}, el('h4', { textContent: '이렇게 읽어요' }), el('ul', {}, ...g.read.map(t => el('li', { textContent: t })))),
+        el('div', {}, el('h4', { textContent: '차트 위 표시' }), ...(kinds.length
+          ? kinds.map(s => el('div', { className: 'sig' }, el('span', { className: 'icon' }, icon(s)), el('span', {}, el('b', { textContent: s.text + ' ' }), s.note)))
+          : [el('div', { textContent: '이 차트 구간엔 표시할 신호가 없어요.' })]))),
+      el('div', { className: 'caution', textContent: '주의 · ' + g.caution }),
+      ...(mine.length ? [el('h4', { textContent: '이 차트에서 찾은 신호 · 누르면 그 자리로 이동', style: 'margin-top:12px' }),
+        el('div', { className: 'recent' }, ...mine.slice(-12).reverse().map(s => el('button', { className: guideFocus === s ? 'on' : '', onclick: () => focusSignal(v, s) },
+          icon(s), ' ' + s.text + ' · ' + date(s.time))))] : []),
+      ...(guideFocus ? [el('div', { className: 'focus', style: 'color:' + guideFocus.color },
+        el('b', { textContent: date(guideFocus.time) + ' ' + guideFocus.text }), el('div', { textContent: guideFocus.note, style: 'color:var(--text)' }))] : []),
+      el('div', { className: 'src', textContent: '출처: ' + g.src + ' · 판단을 돕는 참고 정보이고 매매 신호가 아니에요' }));
+  }
+  // 신호 자리로 차트를 옮기고 그 봉에 십자선을 둔다
+  function focusSignal(v, s) {
+    guideFocus = s;
+    const i = v.bars.findIndex(b => b.time === s.time);
+    v.chart.timeScale().setVisibleLogicalRange({ from: i - 60, to: i + 20 });
+    // 범위 이동은 다음 화면에 반영되고 십자선은 화면 좌표로 남아서, 이동이 끝난 뒤에 둔다
+    requestAnimationFrame(() => requestAnimationFrame(() => v.chart.setCrosshairPosition(v.bars[i].close, s.time, v.main)));
+    renderGuide(v);
   }
 
   // 지금 상태: 켜 둔 지표마다 [이름, 상태, 보통 이렇게 읽음 · 주의할 점]
@@ -417,7 +535,8 @@
   function menuPanel() {
     if (menu === 'ind') {
       return el('div', { className: 'menu' }, ...INDICATORS.map(ind => el('label', {},
-        el('input', { type: 'checkbox', checked: prefs.on.includes(ind.key), onchange: () => toggleIndicator(ind.key) }), ind.name)));
+        el('input', { type: 'checkbox', checked: prefs.on.includes(ind.key), onchange: () => toggleIndicator(ind.key) }), ind.name,
+        el('button', { textContent: '보는 법', onclick: e => { e.preventDefault(); openGuide(ind.key); } }))));
     }
     if (menu === 'compare') {
       const others = stockList.filter(s => s.stockCode !== selected?.stockCode);
@@ -478,17 +597,18 @@
         el('span', {}, k + ' ', el('b', { className: dir(val), textContent: fmt(val) }))),
       rate == null ? '' : el('b', { className: dir(bar.close), textContent: (rate >= 0 ? '+' : '') + rate.toFixed(2) + '%' }),
       el('span', { textContent: '거래량 ' + bar.volume.toLocaleString('en-US') }))];
-    for (const ind of INDICATORS.filter(ind => v.plots.some(p => p.ind === ind))) {
+    // 지표는 한 줄에 모아서 차트를 덜 가린다. 이름을 누르면 보는 법
+    const chips = INDICATORS.filter(ind => v.plots.some(p => p.ind === ind)).map(ind => {
       const hidden = prefs.hidden.includes(ind.key);
-      rows.push(el('div', { className: 'row' + (hidden ? ' off' : '') },
+      return el('span', { className: 'chip' + (hidden ? ' off' : '') },
         btn(hidden ? '○' : '●', () => toggleHidden(ind.key), false, hidden ? '보이기' : '숨기기'),
         btn('×', () => toggleIndicator(ind.key), false, '지표 삭제'),
-        el('span', { textContent: ind.name }),
-        ...ind.lines.filter(l => l.label).map(l => colored(String(l.label), l.color))));
-    }
-    for (const s of (v.signals ?? []).filter(s => s.time === bar.time)) {
-      rows.push(el('div', { className: 'row note' }, colored(s.text, s.color), el('span', { textContent: s.note })));
-    }
+        el('span', { className: 'name', textContent: ind.name, title: '보는 법', onclick: () => openGuide(ind.key) }),
+        ...ind.lines.filter(l => l.label).map(l => colored(String(l.label), l.color)));
+    });
+    if (chips.length) rows.push(el('div', { className: 'row' }, ...chips));
+    const marks = (v.signals ?? []).filter(s => s.time === bar.time);
+    if (marks.length) rows.push(el('div', { className: 'row note' }, ...marks.map(s => colored(ICON[s.shape] + ' ' + s.text, s.color))));
     for (const c of v.compares) {
       rows.push(el('div', { className: 'row' }, btn('×', () => toggleCompare(c.code), false, '비교 해제'), colored('비교 ' + c.code + ' (%)', c.color)));
     }
@@ -511,6 +631,7 @@
     view = null;
     renderLegend(null);
     renderStatus(null);
+    renderGuide(null);
     if (!code) return;
     renderToolbar();
     const interval = prefs.interval, tick = interval === 'tick';
@@ -562,14 +683,15 @@
     plots.forEach(p => p.series.setData(toData(bars, p.line.calc(bars))));
     // ponytail: 표시는 차트를 열 때만 다시 찾는다 (실시간 체결로 새로 생긴 크로스는 다시 열어야 보임). 지금 상태 칸은 체결마다 갱신
     v.signals = signals(bars, inds.map(i => i.key));
-    // 글자는 최근 5개만 (전부 달면 겹쳐서 안 보인다). 나머지는 모양만, 마우스를 올리면 범례에 설명
-    LC.createSeriesMarkers(main, v.signals.map(({ note, ...m }, i, all) => i < all.length - 5 ? { ...m, text: '' } : m));
+    // 차트엔 모양만 (글자를 달면 봉과 겹친다). 이름·설명은 범례(마우스 올린 봉)와 보는 법 카드에
+    LC.createSeriesMarkers(main, v.signals.map(({ time, position, shape, color }) => ({ time, position, shape, color })));
     const guide = (key, price, title, color) => plots.find(p => p.ind.key === key && p.line.label)?.series
       .createPriceLine({ price, title, color, lineWidth: 1, lineStyle: LC.LineStyle.Dashed, axisLabelVisible: false });
     guide('rsi', 70, '과매수', UP);
     guide('rsi', 30, '과매도', DOWN);
     guide('macd', 0, '0', '#9ca3af');
     renderStatus(v);
+    renderGuide(v);
     compares.forEach((c, i) => {
       const color = COMPARE_COLORS[i % COMPARE_COLORS.length];
       const series = chart.addSeries(LC.LineSeries, { color, lineWidth: 2, priceLineVisible: false });
