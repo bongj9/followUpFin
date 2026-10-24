@@ -4,6 +4,7 @@ import com.bongj9.briefing.application.CandleService;
 import com.bongj9.briefing.application.port.MarketData;
 import com.bongj9.briefing.domain.FollowedStock;
 import com.bongj9.briefing.domain.InvestorFlow;
+import com.bongj9.briefing.domain.MarketFlow;
 import com.bongj9.briefing.domain.Orderbook;
 import com.bongj9.briefing.domain.Trade;
 import org.springframework.http.HttpStatus;
@@ -56,6 +57,16 @@ class LiveController {
         }
         requireMarket();
         return market.investorFlows(symbol, 10);
+    }
+
+    // 시장 전체 투자자별 순매수 금액 (오래된 순). 외국인 누적 순매수 차트용
+    @GetMapping("/api/market-flows")
+    List<MarketFlow> marketFlows(@RequestParam(defaultValue = "KOSPI") String symbol) {
+        if (!symbol.equals("KOSPI") && !symbol.equals("KOSDAQ")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "KOSPI 또는 KOSDAQ");
+        }
+        requireMarket();
+        return market.marketFlows(symbol, 200).reversed();
     }
 
     // 캔들 차트 초기 데이터 (오래된 순)

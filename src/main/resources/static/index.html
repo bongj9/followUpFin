@@ -13,8 +13,14 @@
   h1 { font-size: 18px; margin: 0; }
   #updated { color: var(--muted); font-size: 13px; }
   /* 두 페이지. 홈: 관심종목 | 뉴스·공시 / 종목(main.page-stock): 헤더, 차트 | 이 종목 뉴스·공시, 아래 투자자·호가·체결 */
-  main { display: grid; grid-template-columns: 280px minmax(0, 1fr); grid-template-areas: "watch feed"; gap: 16px; padding: 16px 20px; max-width: 1440px; margin: 0 auto; align-items: start; }
-  #watch { grid-area: watch; } #feedBox { grid-area: feed; } #head { grid-area: head; } #chartSection { grid-area: chart; } #below { grid-area: below; }
+  main { display: grid; grid-template-columns: 280px minmax(0, 1fr); grid-template-areas: "watch flow" "watch feed"; gap: 16px; padding: 16px 20px; max-width: 1440px; margin: 0 auto; align-items: start; }
+  #watch { grid-area: watch; align-self: start; } #feedBox { grid-area: feed; } #flowBox { grid-area: flow; }
+  main.page-stock #flowBox { display: none; }
+  #flowBox .flowHead { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  #flowBox h2 { margin: 0; }
+  #flowSummary { font-size: 13px; margin: 6px 0 8px; display: flex; flex-direction: column; gap: 2px; }
+  #flowSummary .why { color: var(--muted); }
+  #flowChart { height: 260px; position: relative; } #head { grid-area: head; } #chartSection { grid-area: chart; } #below { grid-area: below; }
   #head, #chartSection, #below { display: none; }
   main.page-stock { grid-template-columns: minmax(0, 1fr) 380px; grid-template-areas: "head head" "chart feed" "below feed"; }
   main.page-stock #watch { display: none; }
@@ -22,7 +28,7 @@
   main.page-stock #feedBox { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; } /* 차트를 내려 봐도 뉴스는 옆에 남는다 */
   #below { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; align-items: start; }
   @media (max-width: 1100px) { main.page-stock { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "chart" "feed" "below"; } main.page-stock #feedBox { position: static; max-height: none; } }
-  @media (max-width: 720px) { main { grid-template-columns: minmax(0, 1fr); grid-template-areas: "watch" "feed"; padding: 12px 16px; } header { padding: 12px 16px; gap: 8px; } #updated { display: none; } }
+  @media (max-width: 720px) { main { grid-template-columns: minmax(0, 1fr); grid-template-areas: "watch" "flow" "feed"; padding: 12px 16px; } header { padding: 12px 16px; gap: 8px; } #updated { display: none; } }
   .up { color: #dc2626; } .down { color: #2563eb; }
   /* 상단 지표 띠: 같은 목록을 두 번 이어 붙이고 절반만큼 왼쪽으로 흘려서 끊김 없이 돈다. 마우스를 올리면 멈춘다 */
   #ticker { overflow: hidden; background: var(--card); border-bottom: 1px solid var(--line); }
@@ -181,6 +187,11 @@
     <section><h2>호가</h2><div id="book"></div></section>
     <section><h2>체결</h2><div id="trades"></div></section>
   </div>
+  <section id="flowBox">
+    <div class="flowHead"><h2>외국인 수급</h2><div class="tabs" id="flowTabs"></div></div>
+    <div id="flowSummary"></div>
+    <div id="flowChart"></div>
+  </section>
   <section id="feedBox">
     <h2 id="feedTitle">전체 뉴스·공시</h2>
     <div class="tabs" id="tabs"></div>
@@ -331,8 +342,8 @@
       const width = mid.map((m, i) => m == null ? null : (up[i] - lo[i]) / m);
       let squeezed = false;
       each(i => {
-        if (crossed(c, up, i) > 0) mark('bb', i, 'aboveBar', 'circle', UP, '상단 돌파', '종가가 볼린저 상단 위로: 평소보다 크게 오름. 과열일 수도, 강한 추세의 시작일 수도 있다 (거래량과 같이 볼 것)');
-        if (crossed(c, lo, i) < 0) mark('bb', i, 'belowBar', 'circle', DOWN, '하단 이탈', '종가가 볼린저 하단 아래로: 평소보다 크게 내림. 반등 자리일 수도, 하락이 이어질 수도 있다');
+        if (crossed(c, up, i) > 0) mark('bb', i, 'aboveBar', 'circle', UP, '상단 돌파', '종가가 볼린저 상단 위로: 평소보다 크게 오름. 과열로 보는 시각과, 처음 뚫은 거라 오르는 힘이 세다(더 간다)는 시각이 갈린다. 거래량이 같이 늘었는지 볼 것');
+        if (crossed(c, lo, i) < 0) mark('bb', i, 'belowBar', 'circle', DOWN, '하단 이탈', '종가가 볼린저 하단 아래로: 평소보다 크게 내림. 반등 자리로 보는 시각과, 처음 닿은 거라 내리는 힘이 세다(더 간다)는 시각이 갈린다. 다음 봉들이 밴드 안으로 돌아오는지가 갈림길');
         // 스퀴즈: 밴드 폭이 최근 120봉 중 가장 좁을 때 (처음 좁아진 봉에만 표시)
         const recent = width.slice(Math.max(0, i - 119), i + 1).filter(w => w != null);
         const now = recent.length >= 120 && width[i] <= Math.min(...recent);
@@ -380,8 +391,11 @@
       read: ['가격이 선 위면 그 기간에 산 사람들이 평균적으로 이익인 상태', '정배열(5>20>60>120)은 상승 추세, 역배열은 하락 추세', '상승 추세에선 20선 근처까지 내려왔다 다시 오르는 눌림이 자주 나온다'],
       caution: '평균이라 늦게 반응한다. 옆으로 기는 장에선 크로스가 자주 나왔다 사라진다(휩쏘).', src: '그랜빌 8법칙 (Granville, 1976)' },
     bb: { what: '20봉 평균선 위아래로 표준편차 2배만큼 띄운 띠. 가격은 대부분 이 띠 안에서 움직인다.',
-      read: ['상단 근처는 평소보다 많이 오른 자리, 하단 근처는 많이 내린 자리', '띠가 좁아지면(스퀴즈) 쉬던 가격이 곧 크게 움직이는 일이 많다', '강한 추세에선 상단(하단)을 타고 계속 움직인다 (밴드 워킹)'],
-      caution: '상단을 넘었다고 바로 팔 신호가 아니다. RSI·거래량과 같이 보라고 만든 사람이 권한다.', src: 'Bollinger on Bollinger Bands (2001)' },
+      read: ['상단 근처는 평소보다 많이 오른 자리, 하단 근처는 많이 내린 자리', '띠가 좁아지면(스퀴즈) 쉬던 가격이 곧 크게 움직이는 일이 많다',
+        '해석이 두 갈래다: 밴드 밖은 곧 돌아온다(반등·되돌림)는 시각과, 처음 닿은 건 그 방향 힘이 세다는 뜻이라 더 간다(추세 추종)는 시각',
+        '밴드 밖에서 밴드를 끌고 내려가면 가장 가파른 하락. 이때 바닥을 미리 판단하지 않는다'],
+      caution: '하단 이탈 = 싸다, 상단 돌파 = 비싸다가 아니다. 강한 추세에선 밴드를 타고 계속 간다(밴드 워킹). RSI·거래량과 같이 본다.',
+      src: 'Bollinger on Bollinger Bands (2001) · 추세 추종 해석 예: 유튜브 지표추적자(알상무) 2026.10 코스피 하락 해설' },
     ichimoku: { what: '구름(빨강·파랑 선행스팬 사이)이 지지·저항 역할을 한다. 주황 전환선(9봉), 초록 기준선(26봉), 회색 후행스팬.',
       read: ['가격이 구름 위면 상승 추세, 아래면 하락 추세, 안이면 방향을 찾는 중', '전환선이 기준선 위로 올라가면 호전, 아래로 내려가면 역전', '구름이 두꺼울수록 뚫기 어렵다'],
       caution: '선이 많아 복잡하다. 처음엔 가격이 구름 위인지 아래인지만 봐도 충분하다.', src: '호소다 고이치 (1969 공개)' },
@@ -480,7 +494,7 @@
         const width = mid.map((m, k) => m == null ? null : (up[k] - lo[k]) / m).slice(-120).filter(w => w != null);
         const rank = width.filter(w => w < width.at(-1)).length / width.length;
         const where = z >= 2 ? ['상단 위', '평소보다 많이 오른 자리(과열권). 단, 강한 상승장에선 상단을 타고 계속 오르기도 한다(밴드 워킹)']
-          : z <= -2 ? ['하단 아래', '평소보다 많이 내린 자리(침체권). 단, 하락장에선 하단을 타고 계속 내리기도 한다']
+          : z <= -2 ? ['하단 아래', '평소보다 많이 내린 자리. 반등을 기대하는 시각도 있지만, 밴드 밖에서 계속 내려가는 중이면 바닥 판단은 이르다']
           : [z >= 0 ? '중심선 위' : '중심선 아래', '밴드 안: 평소 움직임 범위'];
         const squeeze = width.length >= 60 && rank <= 0.1 ? ' · 밴드 폭이 최근 중 가장 좁은 편(스퀴즈)' : '';
         rows.push(['볼린저밴드', `${where[0]} (${signed(z)}σ)${squeeze}`, where[1]]);
@@ -1092,6 +1106,61 @@
   }
 
   // 주소로 화면을 정한다 (#/, #/stock/005930, #/industry/이름). 새로고침·뒤로가기·링크 공유가 된다
+  // 홈: 시장 전체 외국인 순매수. 위 칸은 누적과 그 4주(20영업일) 평균, 아래 칸은 하루치 (조원)
+  // 누적선이 평균선을 뚫고 올라오면 외국인이 사는 쪽으로 돌아선 것으로 본다
+  const FLOW_MARKETS = [['KOSPI', '코스피'], ['KOSDAQ', '코스닥']];
+  let flowMarket = 'KOSPI', flowChart = null;
+  const flowCache = new Map(); // 시장 → { at, flows } (홈에 돌아올 때마다 토스를 부르지 않게 10분)
+  async function loadFlows() {
+    if (selected?.stockCode) return;
+    document.getElementById('flowTabs').replaceChildren(...FLOW_MARKETS.map(([k, label]) =>
+      el('button', { textContent: label, className: k === flowMarket ? 'active' : '', onclick: () => { flowMarket = k; loadFlows(); } })));
+    let hit = flowCache.get(flowMarket);
+    if (!hit || Date.now() - hit.at > 600_000) {
+      const res = await fetch('/api/market-flows?symbol=' + flowMarket);
+      hit = { at: Date.now(), flows: res.ok ? await res.json() : [] };
+      if (res.ok) flowCache.set(flowMarket, hit);
+    }
+    renderFlows(hit.flows);
+  }
+  function renderFlows(flows) {
+    flowChart?.remove();
+    flowChart = null;
+    const summary = document.getElementById('flowSummary');
+    if (flows.length < 21) return summary.replaceChildren(el('div', { className: 'why', textContent: '수급 데이터를 받지 못했어요.' }));
+    const jo = v => v / 1e12;
+    let sum = 0;
+    const cum = flows.map(f => sum += f.foreigner);
+    const avg = sma(cum, 20);
+    const above = i => cum[i] > avg[i];
+    const n = flows.length - 1;
+    let days = 1;
+    while (days <= n && avg[n - days] != null && above(n - days) === above(n)) days++;
+    const week = key => jo(flows.slice(-5).reduce((a, f) => a + f[key], 0));
+    const signed = v => (v >= 0 ? '+' : '') + v.toFixed(1) + '조';
+    summary.replaceChildren(
+      el('div', {}, el('b', { textContent: `누적선이 4주 평균선 ${above(n) ? '위' : '아래'} (${days}일째) ` }),
+        el('span', { className: 'why', textContent: above(n) ? '· 외국인이 사는 쪽으로 돌아선 상태. 수급을 중시하는 투자자는 이때 비중을 늘린다'
+          : '· 외국인이 아직 파는 흐름. 누적선이 평균선을 뚫고 올라오는지 지켜본다' })),
+      el('div', { textContent: `최근 5일 순매수 · 외국인 ${signed(week('foreigner'))} · 기관 ${signed(week('institution'))} · 개인 ${signed(week('individual'))}` }),
+      el('div', { className: 'why', textContent: `${flows[0].date}부터 ${flows.length}영업일 누적 (기준일에 따라 수치는 달라지니 선의 방향을 보세요) · 마지막 ${flows[n].date}, 당일은 잠정치` }));
+    const chart = flowChart = LC.createChart(document.getElementById('flowChart'), {
+      autoSize: true, layout: { fontSize: 11, panes: { separatorColor: '#e5e7eb' } },
+      grid: { vertLines: { color: '#f1f3f5' }, horzLines: { color: '#f1f3f5' } },
+      localization: { priceFormatter: v => v.toFixed(1) + '조' } });
+    const line = chart.addSeries(LC.LineSeries, { color: '#111827', lineWidth: 2, priceLineVisible: false, title: '누적' });
+    line.setData(flows.map((f, i) => ({ time: f.date, value: jo(cum[i]) })));
+    chart.addSeries(LC.LineSeries, { color: DOWN, lineWidth: 1, lineStyle: LC.LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false, title: '4주 평균' })
+      .setData(flows.flatMap((f, i) => avg[i] == null ? [] : [{ time: f.date, value: jo(avg[i]) }]));
+    chart.addSeries(LC.HistogramSeries, { priceLineVisible: false }, 1)
+      .setData(flows.map(f => ({ time: f.date, value: jo(f.foreigner), color: f.foreigner >= 0 ? UP : DOWN })));
+    chart.panes().forEach((p, i) => p.setStretchFactor(i === 0 ? 3 : 1));
+    // 누적선이 평균선을 뚫은 날 표시
+    LC.createSeriesMarkers(line, flows.flatMap((f, i) => i === 0 || avg[i - 1] == null || above(i) === above(i - 1) ? []
+      : [{ time: f.date, position: above(i) ? 'belowBar' : 'aboveBar', shape: above(i) ? 'arrowUp' : 'arrowDown', color: above(i) ? UP : DOWN }]));
+    chart.timeScale().fitContent();
+  }
+
   function parseHash() {
     const [, kind, value] = location.hash.match(/^#\/(stock|industry)\/(.+)$/) ?? [];
     const v = value && decodeURIComponent(value);
@@ -1109,7 +1178,7 @@
     // 종목을 골랐으면 종목 페이지, 아니면 홈. 차트를 만들기 전에 바꿔야 차트가 제 크기로 그려진다
     document.getElementById('main').classList.toggle('page-stock', !!selected?.stockCode);
     renderTabs(); // 시장 탭은 홈에서만 보인다
-    await Promise.all([loadStocks(), loadFeed(), loadChart(), loadSide(), loadIndicators()]);
+    await Promise.all([loadStocks(), loadFeed(), loadChart(), loadSide(), loadIndicators(), loadFlows()]);
     renderHead();
     renderSide(); // 전일 종가가 늦게 와도 호가 등락률을 다시 계산
     document.getElementById('updated').textContent = new Date().toLocaleTimeString('ko-KR') + ' 갱신';

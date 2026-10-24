@@ -3,6 +3,7 @@ package com.bongj9.briefing.application.port;
 import com.bongj9.briefing.domain.Candle;
 import com.bongj9.briefing.domain.Holding;
 import com.bongj9.briefing.domain.InvestorFlow;
+import com.bongj9.briefing.domain.MarketFlow;
 import com.bongj9.briefing.domain.LastPrice;
 import com.bongj9.briefing.domain.Orderbook;
 import com.bongj9.briefing.domain.Trade;
@@ -31,6 +32,9 @@ public interface MarketData {
 
     // 국내 종목만. 최신 날짜부터 최대 count일
     List<InvestorFlow> investorFlows(String symbol, int count);
+
+    // 시장(KOSPI, KOSDAQ) 전체 투자자별 순매수 금액. 최신 날짜부터 count일 (일별)
+    List<MarketFlow> marketFlows(String symbol, int count);
 
     // 시장 지표(KOSPI, KOSDAQ) 캔들. interval은 1m 또는 1d, 최대 200개
     List<Candle> indicatorCandles(String symbol, String interval, int count);

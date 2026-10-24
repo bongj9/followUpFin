@@ -4,6 +4,7 @@ import com.bongj9.briefing.application.port.MarketData;
 import com.bongj9.briefing.domain.Candle;
 import com.bongj9.briefing.domain.Holding;
 import com.bongj9.briefing.domain.InvestorFlow;
+import com.bongj9.briefing.domain.MarketFlow;
 import com.bongj9.briefing.domain.LastPrice;
 import com.bongj9.briefing.domain.Orderbook;
 import com.bongj9.briefing.domain.Trade;
@@ -33,6 +34,7 @@ import java.util.function.Function;
 public class TossClient implements MarketData {
 
     private static final int CANDLE_PAGE = 200; // 토스 최대값
+    private static final int FLOW_PAGE = 100; // 시장 투자자별 매매대금 최대값
 
     private final RestClient restClient = RestClient.builder()
             .baseUrl("https://openapi.tossinvest.com")
@@ -173,6 +175,32 @@ public class TossClient implements MarketData {
                 .records()).stream()
                 .map(TossInvestorRecord::toFlow)
                 .toList();
+    }
+
+    // 시장 전체 투자자별 매매대금. 한 번에 100일까지라 nextUntil로 이어 받는다
+    @Override
+    public List<MarketFlow> marketFlows(String symbol, int count) {
+        List<MarketFlow> flows = new ArrayList<>();
+        String until = null;
+        while (flows.size() < count) {
+            String from = until;
+            MarketFlowPage page = call(token -> restClient.get()
+                    .uri(u -> u.path("/api/v1/market-indicators/{symbol}/investor-trading")
+                            .queryParam("interval", "1d")
+                            .queryParam("count", Math.min(count - flows.size(), FLOW_PAGE))
+                            .queryParamIfPresent("until", Optional.ofNullable(from))
+                            .build(symbol))
+                    .header("Authorization", "Bearer " + token)
+                    .retrieve()
+                    .body(MarketFlowResponse.class)
+                    .result());
+            page.records().forEach(r -> flows.add(r.toFlow()));
+            if (page.nextUntil() == null || page.records().isEmpty()) {
+                break;
+            }
+            until = page.nextUntil();
+        }
+        return flows;
     }
 
     // 계좌는 종합매매(BROKERAGE) 하나만 나온다. 보유 주식 API는 계좌 번호가 아니라 accountSeq를 헤더로 받는다
@@ -344,5 +372,26 @@ public class TossClient implements MarketData {
     }
 
     record TossHolding(String holdingRate) {
+    }
+
+    record MarketFlowResponse(MarketFlowPage result) {
+    }
+
+    record MarketFlowPage(List<MarketFlowRecord> records, String nextUntil) {
+    }
+
+    // 기관 세부(breakdown)·기타법인은 받지 않는다
+    record MarketFlowRecord(String date, TossAmount individual, TossAmount foreigner, TossAmount institution) {
+
+        MarketFlow toFlow() {
+            return new MarketFlow(LocalDate.parse(date), individual.net(), foreigner.net(), institution.net());
+        }
+    }
+
+    record TossAmount(String buyAmount, String sellAmount) {
+
+        long net() {
+            return Long.parseLong(buyAmount) - Long.parseLong(sellAmount);
+        }
     }
 }
