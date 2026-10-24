@@ -122,6 +122,10 @@
   #legend .row.off span { opacity: 0.35; }
   #measure { position: absolute; z-index: 4; font-size: 12px; font-weight: 700; background: #fff; border: 1px solid currentColor; border-radius: 6px; padding: 2px 6px; pointer-events: none; white-space: nowrap; }
   #measure[hidden] { display: none; }
+  #legend .row.note { color: var(--muted); }
+  #status { padding: 10px 14px; border-top: 1px solid #f1f3f5; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+  #status:empty { display: none; }
+  #status .why { color: var(--muted); }
   #live { font-size: 12px; color: var(--muted); }
   .empty { color: var(--muted); padding: 24px; text-align: center; }
   button.more { display: block; width: 100%; margin-top: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); font: inherit; font-size: 14px; color: var(--text); cursor: pointer; }
@@ -145,7 +149,7 @@
   </aside>
   <div id="head"></div>
   <section id="chartSection">
-    <div id="chartBox" hidden><div id="toolbar"></div><div id="chartWrap"><div id="legend"></div><div id="measure" hidden></div><div id="chart"></div></div></div>
+    <div id="chartBox" hidden><div id="toolbar"></div><div id="chartWrap"><div id="legend"></div><div id="measure" hidden></div><div id="chart"></div></div><div id="status"></div></div>
   </section>
   <div id="below">
     <section id="investorBox" hidden><h2>투자자별 순매수 <span id="holding"></span></h2><div id="investors"></div></section>
@@ -273,6 +277,104 @@
       { label: '26 9', color: '#f97316', calc: b => macdSignal(closes(b)) }] },
   ];
 
+  // 판단 재료: 지표에서 눈여겨볼 순간을 찾아 봉 위에 표시한다. 사라·팔아라가 아니라 '이런 일이 있었다'만 알린다
+  // 켜 둔 지표만 본다. 결과는 { time, position, shape, color, text, note } (note는 마우스를 올리면 범례에 나오는 설명)
+  function signals(bars, on) {
+    const c = closes(bars), out = [];
+    const mark = (i, up, shape, text, note) => out.push({ time: bars[i].time, position: up ? 'belowBar' : 'aboveBar',
+      shape, color: up ? UP : DOWN, text, note });
+    const crossed = (a, b, i) => a[i - 1] != null && b[i - 1] != null && a[i] != null && b[i] != null
+      ? Math.sign(a[i] - b[i]) - Math.sign(a[i - 1] - b[i - 1]) : 0;
+    if (on.includes('ma')) {
+      for (const [f, l] of [[5, 20], [20, 60]]) {
+        const fast = sma(c, f), slow = sma(c, l);
+        for (let i = 1; i < bars.length; i++) {
+          const d = crossed(fast, slow, i);
+          if (d > 0) mark(i, true, 'arrowUp', '골든 ' + f + '·' + l, `${f}선이 ${l}선을 위로 뚫음 (골든크로스): 단기 흐름이 더 길게 본 흐름보다 강해졌다는 뜻. 횡보장에선 자주 속는다`);
+          if (d < 0) mark(i, false, 'arrowDown', '데드 ' + f + '·' + l, `${f}선이 ${l}선을 아래로 뚫음 (데드크로스): 단기 흐름이 약해졌다는 뜻. 이미 많이 내린 뒤에 늦게 나오기도 한다`);
+        }
+      }
+    }
+    if (on.includes('bb')) {
+      const mid = sma(c, 20), up = bollinger(c, 20, 1), lo = bollinger(c, 20, -1);
+      const width = mid.map((m, i) => m == null ? null : (up[i] - lo[i]) / m);
+      let squeezed = false;
+      for (let i = 1; i < bars.length; i++) {
+        if (crossed(c, up, i) > 0) mark(i, false, 'circle', '상단 돌파', '종가가 볼린저 상단 위로: 평소보다 크게 오름. 과열로 볼 수도, 강한 추세의 시작으로 볼 수도 있다 (거래량과 같이 볼 것)');
+        if (crossed(c, lo, i) < 0) mark(i, true, 'circle', '하단 이탈', '종가가 볼린저 하단 아래로: 평소보다 크게 내림. 반등 자리일 수도, 하락이 이어질 수도 있다');
+        // 스퀴즈: 밴드 폭이 최근 120봉 중 가장 좁을 때 (큰 움직임 전에 자주 나오지만 방향은 알려주지 않는다)
+        const recent = width.slice(Math.max(0, i - 119), i + 1).filter(w => w != null);
+        const now = recent.length >= 120 && width[i] <= Math.min(...recent);
+        if (now && !squeezed) out.push({ time: bars[i].time, position: 'aboveBar', shape: 'square', color: '#f59e0b', text: '스퀴즈',
+          note: '볼린저 밴드 폭이 최근 120봉 중 가장 좁음 (스퀴즈): 움직임이 잦아든 상태. 이후 크게 움직이는 일이 많지만 방향은 모른다' });
+        squeezed = now;
+      }
+    }
+    return out.sort((a, b) => a.time - b.time);
+  }
+
+  // 지금 상태: 켜 둔 지표마다 [이름, 상태, 보통 이렇게 읽음 · 주의할 점]
+  function status(bars, on) {
+    const c = closes(bars), i = c.length - 1, last = c[i], rows = [];
+    const pct = (a, b) => (a / b - 1) * 100;
+    const signed = n => (n >= 0 ? '+' : '') + n.toFixed(1);
+    if (on.includes('ma')) {
+      const [m5, m20, m60, m120] = [5, 20, 60, 120].map(n => sma(c, n)[i]);
+      if (m120 != null) {
+        const order = m5 > m20 && m20 > m60 && m60 > m120 ? ['정배열 (5>20>60>120)', '짧게 보나 길게 보나 오르는 흐름. 추세가 이어지는 동안은 눌림(20선 근처)을 기다리는 사람이 많다']
+          : m5 < m20 && m20 < m60 && m60 < m120 ? ['역배열 (5<20<60<120)', '짧게 보나 길게 보나 내리는 흐름. 반등이 나와도 위의 이동평균선에서 막히기 쉽다']
+          : ['섞여 있음', '추세가 뚜렷하지 않거나 바뀌는 중. 크로스 신호가 자주 속는 구간'];
+        rows.push(['이동평균선', order[0] + ` · 현재가는 20선 대비 ${signed(pct(last, m20))}%`, order[1]]);
+      }
+    }
+    if (on.includes('bb')) {
+      const mid = sma(c, 20), up = bollinger(c, 20, 1), lo = bollinger(c, 20, -1);
+      if (mid[i] != null) {
+        const z = 2 * (last - mid[i]) / (up[i] - mid[i]);
+        const width = mid.map((m, k) => m == null ? null : (up[k] - lo[k]) / m).slice(-120).filter(w => w != null);
+        const rank = width.filter(w => w < width.at(-1)).length / width.length;
+        const where = z >= 2 ? ['상단 위', '평소보다 많이 오른 자리(과열권). 단, 강한 상승장에선 상단을 타고 계속 오르기도 한다(밴드 워킹)']
+          : z <= -2 ? ['하단 아래', '평소보다 많이 내린 자리(침체권). 단, 하락장에선 하단을 타고 계속 내리기도 한다']
+          : [z >= 0 ? '중심선 위' : '중심선 아래', '밴드 안: 평소 움직임 범위'];
+        const squeeze = width.length >= 60 && rank <= 0.1 ? ' · 밴드 폭이 최근 중 가장 좁은 편(스퀴즈)' : '';
+        rows.push(['볼린저밴드', `${where[0]} (${signed(z)}σ)${squeeze}`, where[1]]);
+      }
+    }
+    if (on.includes('ichimoku') && bars.length > 52 + 26) {
+      const t = midRange(bars, 9), k = midRange(bars, 26);
+      const a = (t[i - 26] + k[i - 26]) / 2, b = midRange(bars, 52)[i - 26];
+      const where = last > Math.max(a, b) ? ['구름 위', '상승 추세로 본다. 구름이 아래에서 받쳐 주는 자리']
+        : last < Math.min(a, b) ? ['구름 아래', '하락 추세로 본다. 구름이 위에서 누르는 자리']
+        : ['구름 안', '방향을 찾는 중. 구름을 어느 쪽으로 빠져나가는지 본다'];
+      rows.push(['일목균형표', where[0], where[1]]);
+    }
+    if (on.includes('volume')) {
+      const avg = sma(bars.map(b => b.volume), 20)[i];
+      if (avg) {
+        const r = bars[i].volume / avg;
+        rows.push(['거래량', `20봉 평균의 ${r.toFixed(1)}배`, r >= 2 ? '평소보다 많이 거래됨. 가격 움직임에 힘이 실렸다는 뜻 (진행 중인 봉은 아직 덜 쌓였을 수 있음)'
+          : r <= 0.5 ? '거래가 적음. 이때 나온 돌파·이탈은 믿기 어렵다' : '평소 수준']);
+      }
+    }
+    if (on.includes('rsi')) {
+      const r = rsi(c)[i];
+      if (r != null) rows.push(['RSI', r.toFixed(0), r >= 70 ? '70 이상 과매수: 최근 오른 힘이 강함. 강세장에선 70 위에 오래 머물기도 한다'
+        : r <= 30 ? '30 이하 과매도: 최근 내린 힘이 강함. 하락장에선 30 아래에 오래 머물기도 한다' : '30~70 중립']);
+    }
+    if (on.includes('macd')) {
+      const m = macd(c)[i], sig = macdSignal(c)[i];
+      if (m != null && sig != null) rows.push(['MACD', `${m >= sig ? '시그널 위' : '시그널 아래'} · 0선 ${m >= 0 ? '위' : '아래'}`,
+        (m >= sig ? '오르는 힘이 커지는 중' : '오르는 힘이 줄어드는 중') + (m >= 0 ? ', 큰 흐름은 상승 쪽' : ', 큰 흐름은 하락 쪽') + '. 이동평균 기반이라 늦게 반응한다']);
+    }
+    return rows;
+  }
+
+  function renderStatus(v) {
+    const rows = v?.bars?.length ? status(v.bars, v.inds.map(i => i.key)) : [];
+    document.getElementById('status').replaceChildren(...rows.map(([name, state, why]) =>
+      el('div', {}, el('b', { textContent: name + ' ' }), state + ' ', el('span', { className: 'why', textContent: '· ' + why }))));
+  }
+
   // 차트 설정은 브라우저에 기억 (없거나 막혀 있으면 기본값)
   const prefs = { interval: '1m', intraday: '1m', type: 'candle', on: ['ma', 'volume'], hidden: [] };
   try { Object.assign(prefs, JSON.parse(localStorage.getItem('chartPrefs')) ?? {}); } catch {}
@@ -384,6 +486,9 @@
         el('span', { textContent: ind.name }),
         ...ind.lines.filter(l => l.label).map(l => colored(String(l.label), l.color))));
     }
+    for (const s of (v.signals ?? []).filter(s => s.time === bar.time)) {
+      rows.push(el('div', { className: 'row note' }, colored(s.text, s.color), el('span', { textContent: s.note })));
+    }
     for (const c of v.compares) {
       rows.push(el('div', { className: 'row' }, btn('×', () => toggleCompare(c.code), false, '비교 해제'), colored('비교 ' + c.code + ' (%)', c.color)));
     }
@@ -405,6 +510,7 @@
     view?.chart.remove();
     view = null;
     renderLegend(null);
+    renderStatus(null);
     if (!code) return;
     renderToolbar();
     const interval = prefs.interval, tick = interval === 'tick';
@@ -442,7 +548,7 @@
     });
     // 높이 비율: 메인 420 : 아래 칸 110씩 (autoSize라 픽셀 대신 비율로 준다)
     chart.panes().forEach((p, i) => p.setStretchFactor(i === 0 ? MAIN_HEIGHT : PANE_HEIGHT));
-    const v = view = { code, interval, type, chart, main, plots, bars: [], compares: [], hover: false };
+    const v = view = { code, interval, type, chart, main, plots, inds, bars: [], compares: [], hover: false };
     chart.subscribeCrosshairMove(p => {
       v.hover = p.time != null;
       renderLegend(v, (p.time != null && v.bars.find(b => b.time === p.time)) || v.bars.at(-1));
@@ -454,6 +560,16 @@
     v.bars = bars;
     main.setData(type === 'candle' ? bars : bars.map(b => ({ time: b.time, value: b.close })));
     plots.forEach(p => p.series.setData(toData(bars, p.line.calc(bars))));
+    // ponytail: 표시는 차트를 열 때만 다시 찾는다 (실시간 체결로 새로 생긴 크로스는 다시 열어야 보임). 지금 상태 칸은 체결마다 갱신
+    v.signals = signals(bars, inds.map(i => i.key));
+    // 글자는 최근 5개만 (전부 달면 겹쳐서 안 보인다). 나머지는 모양만, 마우스를 올리면 범례에 설명
+    LC.createSeriesMarkers(main, v.signals.map(({ note, ...m }, i, all) => i < all.length - 5 ? { ...m, text: '' } : m));
+    const guide = (key, price, title, color) => plots.find(p => p.ind.key === key && p.line.label)?.series
+      .createPriceLine({ price, title, color, lineWidth: 1, lineStyle: LC.LineStyle.Dashed, axisLabelVisible: false });
+    guide('rsi', 70, '과매수', UP);
+    guide('rsi', 30, '과매도', DOWN);
+    guide('macd', 0, '0', '#9ca3af');
+    renderStatus(v);
     compares.forEach((c, i) => {
       const color = COMPARE_COLORS[i % COMPARE_COLORS.length];
       const series = chart.addSeries(LC.LineSeries, { color, lineWidth: 2, priceLineVisible: false });
@@ -545,6 +661,7 @@
     v.main.update(v.type === 'candle' ? bar : { time: bar.time, value: bar.close });
     v.plots.forEach(p => { const val = p.line.calc(v.bars).at(-1); if (val != null) p.series.update(point(bar.time, val)); });
     if (!v.hover) renderLegend(v, bar);
+    renderStatus(v);
   }
 
   // 종목 헤더: 이름·코드·현재가·전일 대비 (토스 종목 화면 맨 위)
