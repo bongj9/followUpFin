@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class StockService {
@@ -45,7 +46,8 @@ public class StockService {
                 continue;
             }
             try {
-                follow(h.symbol(), FollowedStock.isKoreanCode(h.symbol()) ? h.name() : "");
+                boolean keepName = FollowedStock.isKoreanCode(h.symbol()) || FollowedStock.etfUnderlying(h.symbol()).isPresent();
+                follow(h.symbol(), keepName ? h.name() : "");
                 added.add(h.name());
             } catch (InvalidStockException e) {
                 failed.add(h.name() + " (" + e.getMessage() + ")");
@@ -69,8 +71,13 @@ public class StockService {
         }
         name = name == null ? "" : name.strip();
         String industry = null;
+        // 레버리지 ETF는 Finnhub 무료 프로필에 없어서 이름을 안 주면 티커 + 기초 종목으로 둔다
+        Optional<FollowedStock> underlying = FollowedStock.etfUnderlying(code);
+        if (underlying.isPresent() && name.isEmpty()) {
+            name = code + " (" + underlying.get().getName() + " 레버리지)";
+        }
         // 미국 종목은 티커만 받으면 회사명·업종을 채운다
-        if (!FollowedStock.isKoreanCode(code) && profiles.isConfigured()) {
+        if (!FollowedStock.isKoreanCode(code) && underlying.isEmpty() && profiles.isConfigured()) {
             CompanyProfile profile = profiles.profile(code);
             if (profile.name() == null) {
                 throw new InvalidStockException("Finnhub에 없는 티커: " + code);

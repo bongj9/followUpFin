@@ -18,8 +18,10 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -66,7 +68,11 @@ public class FeedService {
         }
         LocalDate sinceDate = LocalDate.ofInstant(since, SEOUL);
 
+        // 레버리지 ETF는 기초 종목 기사를 같이 받아서(MU·MUU) 같은 제목은 한 번만 보여준다
+        // ponytail: 어느 종목 이름표가 남을지는 정하지 않았다
+        Set<String> titles = new HashSet<>();
         Stream<FeedItem> news = newsRepository.findByStockCodeInAndPublishedAtAfter(names.keySet(), since).stream()
+                .filter(n -> titles.add(n.getTitle()))
                 .map(n -> FeedItem.news(n, names.get(n.getStockCode())));
         // ponytail: DART 목록엔 접수 시각이 없어 수집 시각으로 정렬. 첫 수집분은 모두 같은 시각 (SEC는 접수 시각)
         Stream<FeedItem> disclosures = disclosureRepository.findByStockCodeInAndRceptDtGreaterThanEqual(names.keySet(), sinceDate).stream()

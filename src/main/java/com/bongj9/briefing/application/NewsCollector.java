@@ -40,7 +40,7 @@ public class NewsCollector {
     // 새 기사만 저장하고 저장 건수를 돌려준다
     @Transactional
     public int collect(FollowedStock stock) {
-        return save(stock.getStockCode(), fetch(stock));
+        return save(stock.getStockCode(), fetch(stock.newsTarget()));
     }
 
     // 시장 뉴스는 종목 대신 News.MARKET 코드로 저장한다

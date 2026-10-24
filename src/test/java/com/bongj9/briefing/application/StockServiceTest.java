@@ -47,6 +47,19 @@ class StockServiceTest {
         assertThat(saved.getAllValues()).extracting(FollowedStock::getName).containsExactly("삼성전자", "NVIDIA Corp");
     }
 
+    @Test
+    void 레버리지_ETF는_프로필_없이_토스_이름으로_추가하고_뉴스는_기초_종목으로_찾는다() {
+        when(market.holdings()).thenReturn(List.of(holding("MUU", "마이크론 2배 롱", "USD")));
+        when(repository.save(any())).thenAnswer(call -> call.getArgument(0));
+        when(profiles.isConfigured()).thenReturn(true);
+
+        assertThat(service.importHoldings().added()).containsExactly("마이크론 2배 롱");
+        org.mockito.Mockito.verify(profiles, org.mockito.Mockito.never()).profile(any());
+        assertThat(service.follow("SOXL", "").getName()).isEqualTo("SOXL (semiconductor 레버리지)");
+        assertThat(new FollowedStock("MUU", "마이크론 2배 롱", null).newsTarget().getStockCode()).isEqualTo("MU");
+        assertThat(new FollowedStock("NVDA", "NVIDIA Corp", null).newsTarget().getStockCode()).isEqualTo("NVDA");
+    }
+
     private static Holding holding(String symbol, String name, String currency) {
         return new Holding(symbol, name, BigDecimal.ONE, BigDecimal.TEN, currency);
     }
