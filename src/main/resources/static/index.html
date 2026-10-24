@@ -15,7 +15,7 @@
   /* 두 페이지. 홈: 관심종목 | 뉴스·공시 / 종목(main.page-stock): 헤더, 차트 | 이 종목 뉴스·공시, 아래 투자자·호가·체결 */
   main { display: grid; grid-template-columns: 280px minmax(0, 1fr); grid-template-areas: "watch flow" "watch view" "watch feed"; gap: 16px; padding: 16px 20px; max-width: 1440px; margin: 0 auto; align-items: start; }
   #watch { grid-area: watch; align-self: start; } #feedBox { grid-area: feed; } #flowBox { grid-area: flow; }
-  main.page-stock #flowBox, main.page-stock #viewBox { display: none; }
+  main.page-stock #flowBox { display: none; }
   #viewBox { grid-area: view; font-size: 13px; }
   #viewBox[hidden] { display: none; }
   #viewBox h2 { margin: 0; } #viewBox .sub { color: var(--muted); font-size: 12px; }
@@ -29,7 +29,7 @@
   #viewBox .lv b { text-align: right; }
   #viewBox .lv.here { color: #dc2626; font-weight: 700; border-top: 1px dashed #dc2626; border-bottom: 1px dashed #dc2626; padding: 2px 0; }
   #viewBox details { margin-top: 10px; } #viewBox summary { cursor: pointer; font-weight: 600; }
-  #viewBox details ul { margin: 6px 0; padding-left: 18px; }
+  #viewBox details ul, #viewBox ul.said { margin: 0; padding-left: 18px; } #viewBox ul.said li { margin-bottom: 4px; }
   #viewBox .track { margin-top: 10px; color: #9a3412; background: #fff7ed; padding: 8px 10px; border-radius: 8px; }
   @media (max-width: 720px) { #viewBox .step { grid-template-columns: 1fr; } #viewBox .step .read { grid-column: 1; } }
   #flowBox .flowHead { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -38,12 +38,12 @@
   #flowSummary .why { color: var(--muted); }
   #flowChart { height: 260px; position: relative; } #head { grid-area: head; } #chartSection { grid-area: chart; } #below { grid-area: below; }
   #head, #chartSection, #below { display: none; }
-  main.page-stock { grid-template-columns: minmax(0, 1fr) 380px; grid-template-areas: "head head" "chart feed" "below feed"; }
+  main.page-stock { grid-template-columns: minmax(0, 1fr) 380px; grid-template-areas: "head head" "chart feed" "view feed" "below feed"; }
   main.page-stock #watch { display: none; }
   main.page-stock #head { display: flex; } main.page-stock #chartSection { display: block; } main.page-stock #below { display: grid; }
   main.page-stock #feedBox { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; } /* 차트를 내려 봐도 뉴스는 옆에 남는다 */
   #below { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; align-items: start; }
-  @media (max-width: 1100px) { main.page-stock { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "chart" "feed" "below"; } main.page-stock #feedBox { position: static; max-height: none; } }
+  @media (max-width: 1100px) { main.page-stock { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "chart" "view" "feed" "below"; } main.page-stock #feedBox { position: static; max-height: none; } }
   @media (max-width: 720px) { main { grid-template-columns: minmax(0, 1fr); grid-template-areas: "watch" "flow" "view" "feed"; padding: 12px 16px; } header { padding: 12px 16px; gap: 8px; } #updated { display: none; } }
   .up { color: #dc2626; } .down { color: #2563eb; }
   /* 상단 지표 띠: 같은 목록을 두 번 이어 붙이고 절반만큼 왼쪽으로 흘려서 끊김 없이 돈다. 마우스를 올리면 멈춘다 */
@@ -1146,14 +1146,18 @@
 
   // 투자 관점 노트(views/*.json, git 제외: 실존 인물 영상 요약이라 공개 저장소에 안 올린다)를 지금 코스피에 대입한다
   // 노트가 없으면 섹션을 숨긴다. 그가 지금 이렇게 말한 게 아니라 그의 규칙을 지금 데이터에 맞춰 보여주는 것
+  // 종목 페이지에선 같은 차트 규칙을 그 종목 일봉에 대입한다. 외국인 수급은 코스피 전체 것만 있어서 국내 종목에만 붙인다
   async function loadView() {
     const box = document.getElementById('viewBox');
-    if (selected?.stockCode) return;
+    const code = selected?.stockCode ?? 'KOSPI';
     const [note, bars, flows] = await Promise.all([
       fetch('/views/alsangmu.json').then(r => r.ok ? r.json() : null),
-      fetchBars('KOSPI', '1d'), getFlows('KOSPI')]);
-    box.hidden = !note || !bars || bars.length < 121 || flows.length < 21;
-    if (!box.hidden) renderView(box, note, marketState(bars, flows));
+      fetchBars(code, '1d'), code === 'KOSPI' || isKoreanCode(code) ? getFlows('KOSPI') : []]);
+    if (code !== (selected?.stockCode ?? 'KOSPI')) return; // 기다리는 사이 다른 종목으로 옮겼다
+    box.hidden = !note || !bars || bars.length < 121;
+    if (box.hidden) return;
+    const name = code === 'KOSPI' ? '코스피' : stockList.find(x => x.stockCode === code)?.name ?? code;
+    renderView(box, note, marketState(bars, flows.length >= 21 ? flows : null), code, name);
   }
 
   // 코스피 일봉·외국인 누적으로 지금 상태를 고르고, 화면에 보여줄 숫자도 같이 만든다
@@ -1162,13 +1166,13 @@
     const [m20, m60, m120] = [20, 60, 120].map(n => sma(c, n));
     const lo = bollinger(c, 20, -1), up = bollinger(c, 20, 1);
     let sum = 0;
-    const cum = flows.map(f => sum += f.foreigner), avg = sma(cum, 20), n = cum.length - 1;
+    const cum = (flows ?? []).map(f => sum += f.foreigner), avg = sma(cum, 20), n = cum.length - 1;
     const since = test => { let d = 1; while (d < i && test(i - d) === test(i)) d++; return d; };
     const pct = (a, base) => (a / base - 1) * 100;
     const range = b.high - b.low;
     const st = {}, fact = {};
-    st.flow = cum[n] > avg[n] ? 'above' : 'below';
-    fact.flow = `외국인 누적 ${(cum[n] / 1e12).toFixed(0)}조, 4주 평균선 ${st.flow === 'above' ? '위' : '아래'} · 최근 5일 ${(flows.slice(-5).reduce((a, f) => a + f.foreigner, 0) / 1e12).toFixed(1)}조`;
+    if (flows) st.flow = cum[n] > avg[n] ? 'above' : 'below';
+    if (flows) fact.flow = `외국인 누적 ${(cum[n] / 1e12).toFixed(0)}조, 4주 평균선 ${st.flow === 'above' ? '위' : '아래'} · 최근 5일 ${(flows.slice(-5).reduce((a, f) => a + f.foreigner, 0) / 1e12).toFixed(1)}조`;
     const under = [m20, m60, m120].filter(m => c[i] < m[i]).length;
     st.ma = under === 0 ? 'aboveAll' : under === 3 ? 'belowAll' : c[i] < m60[i] ? 'below60' : 'below20';
     fact.ma = `${fmt(c[i])} · 20일선 ${fmt(m20[i])}(${pct(c[i], m20[i]).toFixed(1)}%) · 60일선 ${fmt(m60[i])} · 120일선 ${fmt(m120[i])}`;
@@ -1183,26 +1187,36 @@
     return { st, fact, price: c[i], date: new Date((b.time - KST) * 1000).toLocaleDateString('ko-KR') };
   }
 
-  function renderView(box, note, m) {
+  function renderView(box, note, m, code, name) {
     const cite = ref => {
       const [day, time] = ref.split(' ');
       const sec = time.split(':').reduce((a, v) => a * 60 + +v, 0);
       return el('a', { className: 'cite', href: `https://www.youtube.com/watch?v=${note.videos[day]}&t=${sec}s`, target: '_blank', rel: 'noopener',
         textContent: `▶ ${day.slice(0, 2)}/${day.slice(2)} ${time}` });
     };
-    const levels = [...note.levels, { price: m.price, here: true }].sort((a, b) => b.price - a.price);
+    // 레버리지 ETF는 기초 종목 언급을 보여준다
+    const base = note.aliases?.[code];
+    const said = code === 'KOSPI' ? null : note.stocks?.[base ?? code];
+    const own = code === 'KOSPI' ? note.levels : said?.levels ?? [];
+    const levels = [...own, { price: m.price, here: true }].sort((a, b) => b.price - a.price);
     box.replaceChildren(
-      el('h2', { textContent: note.name + ' · 그의 판단 순서로 본 지금 코스피' }),
-      el('div', { className: 'sub', textContent: `${note.source} · 영상 ${note.asOf}까지 · 지금 데이터 ${m.date} 종가` }),
-      el('div', { className: 'summary', textContent: note.summary }),
-      ...note.steps.map(step => {
+      el('h2', { textContent: `${note.name} · 그의 판단 순서로 본 지금 ${name}` }),
+      el('div', { className: 'sub', textContent: `${note.source} · 영상 ${note.asOf}까지 · 지금 데이터 ${m.date} 종가`
+        + (code === 'KOSPI' ? '' : ' · 지수용 차트 규칙을 이 종목 일봉에 대입') }),
+      el('div', { className: 'summary', textContent: said?.summary ? `그가 본 ${base ? base + ' (이 ETF의 기초 종목)' : name}: ${said.summary}` : note.summary }),
+      ...note.steps.filter(step => m.st[step.key]).map(step => {
         const s = step.states[m.st[step.key]];
-        return el('div', { className: 'step' }, el('b', { textContent: step.title }), el('span', { className: 'now', textContent: m.fact[step.key] }),
+        // 종목 페이지에서 외국인 수급은 코스피 전체 것(그는 종목보다 시장을 먼저 본다)
+        const fact = step.key === 'flow' && code !== 'KOSPI' ? '코스피 전체 · ' + m.fact.flow : m.fact[step.key];
+        return el('div', { className: 'step' }, el('b', { textContent: step.title.replace('코스피', name) }), el('span', { className: 'now', textContent: fact }),
           el('span', { className: 'read' }, '그라면 → ' + s.read, cite(s.cite)));
       }),
-      el('div', { className: 'step' }, el('b', { textContent: '⑥ 그가 말한 레벨' }), el('div', { className: 'levels' }, ...levels.map(l => l.here
+      ...(said?.items?.length ? [el('div', { className: 'step' }, el('b', { textContent: '그가 이 종목에 대해 한 말' }),
+        el('ul', { className: 'said' }, ...said.items.map(r => el('li', {}, r.text, cite(r.cite)))))] : []),
+      ...(code !== 'KOSPI' && !said ? [el('div', { className: 'sub', textContent: '영상 20편에서 이 종목을 따로 다룬 부분은 없어요.' })] : []),
+      ...(own.length ? [el('div', { className: 'step' }, el('b', { textContent: '⑥ 그가 말한 레벨' }), el('div', { className: 'levels' }, ...levels.map(l => l.here
         ? el('div', { className: 'lv here' }, el('b', { textContent: fmt(l.price) }), el('span', { textContent: '← 지금' }))
-        : el('div', { className: 'lv' }, el('b', { textContent: fmt(l.price) }), el('span', {}, l.text, cite(l.cite)))))),
+        : el('div', { className: 'lv' }, el('b', { textContent: fmt(l.price) }), el('span', {}, l.text, cite(l.cite))))))] : []),
       el('details', {}, el('summary', { textContent: '비중 규칙 · 경계할 것' }),
         el('ul', {}, ...note.rules.map(r => el('li', {}, r.text, cite(r.cite)))),
         el('ul', {}, ...note.warnings.map(r => el('li', {}, r.text, cite(r.cite))))),
@@ -1263,7 +1277,7 @@
     // 종목을 골랐으면 종목 페이지, 아니면 홈. 차트를 만들기 전에 바꿔야 차트가 제 크기로 그려진다
     document.getElementById('main').classList.toggle('page-stock', !!selected?.stockCode);
     renderTabs(); // 시장 탭은 홈에서만 보인다
-    await Promise.all([loadStocks(), loadFeed(), loadChart(), loadSide(), loadIndicators(), loadFlows(), loadView()]);
+    await Promise.all([loadStocks().then(loadView), loadFeed(), loadChart(), loadSide(), loadIndicators(), loadFlows()]); // 뷰 제목에 종목 이름이 필요
     renderHead();
     renderSide(); // 전일 종가가 늦게 와도 호가 등락률을 다시 계산
     document.getElementById('updated').textContent = new Date().toLocaleTimeString('ko-KR') + ' 갱신';
