@@ -575,10 +575,10 @@
   }
 
   // 피드 탭 (토스 종목 화면 아래 탭처럼)
-  const TABS = [[null, '전체'], ['NEWS', '뉴스'], ['DISCLOSURE', '공시'], ['MOVE', '급등락'], ['MARKET', '시장']];
-  let feedType = null;
+  const TABS = [['NEWS', '뉴스'], ['DISCLOSURE', '공시'], ['MOVE', '급등락'], ['MARKET', '시장']];
+  let feedType = 'NEWS';
   function renderTabs() {
-    if (selected && feedType === 'MARKET') feedType = null; // 시장 탭은 홈에만
+    if (selected && feedType === 'MARKET') feedType = 'NEWS'; // 시장 탭은 홈에만
     document.getElementById('tabs').replaceChildren(...TABS.filter(([type]) => !selected || type !== 'MARKET').map(([type, label]) =>
       el('button', { textContent: label, className: type === feedType ? 'active' : '', onclick: () => { feedType = type; disc = null; renderTabs(); loadFeed(); } })));
   }
