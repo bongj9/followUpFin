@@ -18,6 +18,11 @@
   main.page-stock #flowBox { display: none; }
   #viewBox { grid-area: view; font-size: 13px; }
   #viewBox[hidden] { display: none; }
+  /* 종목 페이지 맨 위 한 줄 요약. 뷰 본문은 차트 아래라 스크롤해야 보여서 */
+  #viewPeek { grid-area: peek; display: none; font-size: 13px; padding: 10px 14px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; cursor: pointer; }
+  main.page-stock #viewPeek:not([hidden]) { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  #viewPeek .tag { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: #fff; border: 1px solid #bfdbfe; }
+  #viewPeek .more { margin-left: auto; color: #2563eb; white-space: nowrap; }
   #viewBox h2 { margin: 0; } #viewBox .sub { color: var(--muted); font-size: 12px; }
   #viewBox .summary { margin: 8px 0 12px; padding: 8px 10px; background: var(--bg); border-radius: 8px; }
   #viewBox .step { display: grid; grid-template-columns: 150px 1fr; gap: 4px 12px; padding: 8px 0; border-top: 1px solid #f1f3f5; }
@@ -38,12 +43,12 @@
   #flowSummary .why { color: var(--muted); }
   #flowChart { height: 260px; position: relative; } #head { grid-area: head; } #chartSection { grid-area: chart; } #below { grid-area: below; }
   #head, #chartSection, #below { display: none; }
-  main.page-stock { grid-template-columns: minmax(0, 1fr) 380px; grid-template-areas: "head head" "chart feed" "view feed" "below feed"; }
+  main.page-stock { grid-template-columns: minmax(0, 1fr) 380px; grid-template-areas: "head head" "peek peek" "chart feed" "view feed" "below feed"; }
   main.page-stock #watch { display: none; }
   main.page-stock #head { display: flex; } main.page-stock #chartSection { display: block; } main.page-stock #below { display: grid; }
   main.page-stock #feedBox { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; } /* 차트를 내려 봐도 뉴스는 옆에 남는다 */
   #below { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; align-items: start; }
-  @media (max-width: 1100px) { main.page-stock { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "chart" "view" "feed" "below"; } main.page-stock #feedBox { position: static; max-height: none; } }
+  @media (max-width: 1100px) { main.page-stock { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "peek" "chart" "view" "feed" "below"; } main.page-stock #feedBox { position: static; max-height: none; } }
   @media (max-width: 720px) { main { grid-template-columns: minmax(0, 1fr); grid-template-areas: "watch" "flow" "view" "feed"; padding: 12px 16px; } header { padding: 12px 16px; gap: 8px; } #updated { display: none; } }
   .up { color: #dc2626; } .down { color: #2563eb; }
   /* 상단 지표 띠: 같은 목록을 두 번 이어 붙이고 절반만큼 왼쪽으로 흘려서 끊김 없이 돈다. 마우스를 올리면 멈춘다 */
@@ -195,6 +200,7 @@
     <div id="error"></div>
   </aside>
   <div id="head"></div>
+  <div id="viewPeek" hidden></div>
   <section id="chartSection">
     <div id="chartBox" hidden><div id="toolbar"></div><div id="chartWrap"><div id="legend"></div><div id="measure" hidden></div><div id="tip" hidden></div><div id="chart"></div></div><div id="guide" hidden></div><div id="status"></div></div>
   </section>
@@ -1154,10 +1160,22 @@
       fetch('/views/alsangmu.json').then(r => r.ok ? r.json() : null),
       fetchBars(code, '1d'), code === 'KOSPI' || isKoreanCode(code) ? getFlows('KOSPI') : []]);
     if (code !== (selected?.stockCode ?? 'KOSPI')) return; // 기다리는 사이 다른 종목으로 옮겼다
-    box.hidden = !note || !bars || bars.length < 121;
+    const peek = document.getElementById('viewPeek');
+    peek.hidden = box.hidden = !note || !bars || bars.length < 121;
     if (box.hidden) return;
     const name = code === 'KOSPI' ? '코스피' : stockList.find(x => x.stockCode === code)?.name ?? code;
-    renderView(box, note, marketState(bars, flows.length >= 21 ? flows : null), code, name);
+    const m = marketState(bars, flows.length >= 21 ? flows : null);
+    renderView(box, note, m, code, name);
+    peek.hidden = code === 'KOSPI';
+    const said = note.stocks?.[note.aliases?.[code] ?? code];
+    const tag = text => el('span', { className: 'tag', textContent: text });
+    peek.onclick = () => box.scrollIntoView({ behavior: 'smooth' });
+    peek.replaceChildren(el('b', { textContent: note.name }),
+      tag({ aboveAll: '이평선 위', below20: '20일선 아래', below60: '60일선 아래', belowAll: '이평선 모두 아래' }[m.st.ma]),
+      tag(m.st.cross === 'golden' ? '골든크로스' : '데드크로스'),
+      tag({ outsideLow: '볼린저 하단 밖', touchLow: '볼린저 하단', inside: '볼린저 안', outsideHigh: '볼린저 상단 밖' }[m.st.bb]),
+      el('span', { textContent: said?.summary ?? '영상에서 이 종목을 따로 다룬 적은 없어요. 차트 규칙만 대입' }),
+      el('span', { className: 'more', textContent: '자세히 ↓' }));
   }
 
   // 코스피 일봉·외국인 누적으로 지금 상태를 고르고, 화면에 보여줄 숫자도 같이 만든다
