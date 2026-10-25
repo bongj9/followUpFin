@@ -1219,7 +1219,7 @@
     return { st, fact, price: c[i], date: new Date((b.time - KST) * 1000).toLocaleDateString('ko-KR') };
   }
 
-  // 영상 한 편씩 요약한 daily(최신이 앞). 근거 링크는 그 영상의 해당 분으로 간다
+  // 영상 한 편씩 요약한 daily(최신이 앞, 아침 당일전략 · 저녁 지표추적자 · 금요일 RTS). 근거 링크는 그 영상의 해당 분으로 간다
   function renderToday(note) {
     const box = document.getElementById('todayBox');
     const [day, ...past] = note.daily ?? [];
@@ -1231,7 +1231,7 @@
     const label = d => new Date(d.date + 'T00:00:00').toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' });
     const ago = Math.round((Date.now() - new Date(day.date + 'T00:00:00')) / 864e5);
     box.replaceChildren(
-      el('div', { className: 'date' }, `알상무의 오늘 뷰 · ${label(day)} 지표추적자`,
+      el('div', { className: 'date' }, `알상무의 오늘 뷰 · ${label(day)} ${day.show ?? '지표추적자'}`,
         ago > 1 ? el('span', { className: 'stale', textContent: `(${ago}일 전 영상, 새 영상 아직 없음)` }) : ''),
       el('div', { className: 'headline', textContent: day.headline }),
       el('div', { className: 'stance' }, ...[['현금', day.stance?.cash], ['확률', day.stance?.odds], ['행동', day.stance?.action]]
@@ -1243,7 +1243,7 @@
       el('div', { className: 'sub', textContent: `영상: ${day.title} · 그의 말을 요약한 것이고, 투자 판단은 본인 몫이에요` },
         el('a', { className: 'cite', href: `https://www.youtube.com/watch?v=${day.id}`, target: '_blank', rel: 'noopener', textContent: '▶ 영상 보기' })),
       ...(past.length ? [el('details', {}, el('summary', { textContent: `지난 뷰 ${past.length}개` }),
-        ...past.map(d => el('details', {}, el('summary', { textContent: `${label(d)} · ${d.headline}` }),
+        ...past.map(d => el('details', {}, el('summary', { textContent: `${label(d)} ${d.show ?? ''} · ${d.headline}` }),
           list(d, [...(d.chart ?? []), ...(d.points ?? [])]))))] : []));
   }
 
