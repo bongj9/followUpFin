@@ -56,6 +56,10 @@ public class StockService {
         return new ImportResult(added, failed);
     }
 
+    public List<Holding> holdings() {
+        return market.holdings();
+    }
+
     public record ImportResult(List<String> added, List<String> failed) {
     }
 

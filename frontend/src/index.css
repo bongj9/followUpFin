@@ -54,7 +54,7 @@ body { line-height: normal; letter-spacing: -0.01em; -webkit-font-smoothing: ant
 a.cite { font-size: 11px; color: var(--color-link); text-decoration: none; white-space: nowrap; margin-left: 4px; }
 
 /* 페이지 격자. 홈: 관심종목 | 오늘 뷰·수급·뷰·피드 / 종목: 헤더, 요약, 차트·뷰·아래칸 | 피드 */
-.page-home { grid-template-columns: 280px minmax(0, 1fr); grid-template-areas: "watch today" "watch flow" "watch view" "watch feed"; }
-.page-stock { grid-template-columns: minmax(0, 1fr) 380px; grid-template-areas: "head head" "peek peek" "chart feed" "view feed" "below feed"; }
-@media (max-width: 1100px) { .page-stock { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "peek" "chart" "view" "feed" "below"; } }
-@media (max-width: 720px) { .page-home { grid-template-columns: minmax(0, 1fr); grid-template-areas: "watch" "today" "flow" "view" "feed"; } }
+.page-home { grid-template-columns: 280px minmax(0, 1fr); grid-template-areas: "watch report" "watch today" "watch shuka" "watch flow" "watch view" "watch feed"; }
+.page-stock { grid-template-columns: minmax(0, 1fr) 380px; grid-template-areas: "head head" "peek peek" "chart feed" "view feed" "shuka feed" "below feed"; }
+@media (max-width: 1100px) { .page-stock { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "peek" "chart" "view" "shuka" "feed" "below"; } }
+@media (max-width: 720px) { .page-home { grid-template-columns: minmax(0, 1fr); grid-template-areas: "watch" "report" "today" "shuka" "flow" "view" "feed"; } }

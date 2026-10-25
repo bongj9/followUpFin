@@ -2,6 +2,7 @@ package com.bongj9.briefing.adapter.web;
 
 import com.bongj9.briefing.application.StockService;
 import com.bongj9.briefing.domain.FollowedStock;
+import com.bongj9.briefing.domain.Holding;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -40,6 +41,12 @@ class StockController {
     @PostMapping("/api/stocks/import-holdings")
     StockService.ImportResult importHoldings() {
         return stocks.importHoldings();
+    }
+
+    // 토스 계좌 보유 수량·평균단가 (아침 리포트가 비중을 계산할 때 쓴다)
+    @GetMapping("/api/holdings")
+    List<Holding> holdings() {
+        return stocks.holdings();
     }
 
     @DeleteMapping("/api/stocks/{stockCode}")

@@ -42,7 +42,7 @@ export interface NoteLevel { price: number; text: string; cite: string }
 export interface Daily {
   date: string; id: string; title: string; headline: string; show?: string
   stance?: { cash?: string | null; odds?: string | null; action?: string | null }
-  chart?: Cited[]; points?: Cited[]; levels?: NoteLevel[]
+  chart?: Cited[]; points?: Cited[]; levels?: NoteLevel[]; stocks?: Record<string, Cited[]>
 }
 export interface Note {
   name: string; source: string; asOf: string; videos: Record<string, string>; summary: string
@@ -51,6 +51,21 @@ export interface Note {
   aliases?: Record<string, string>
   stocks?: Record<string, { summary?: string; items?: Cited[]; levels?: NoteLevel[] }>
   daily?: Daily[]
+}
+
+// 아침 리포트 (views/report.json, git 제외: 보유 비중이 들어 있어 볼트에 둔다). reports는 최신이 앞
+// 숫자는 scripts/report-facts.ts가 뽑고, 판단(action·why·watch)은 아침 리포트 스킬이 쓴다
+export interface ReportCall { if: string; then: string }
+export interface ReportHolding {
+  code: string; name: string; action: string; weightPct: number | null; targetPct?: number | null
+  why: string[]; watch: ReportCall[]; alsangmu?: string | null
+}
+export interface Report {
+  date: string; generatedAt: string; headline: string
+  market: { stance: string; cashPct?: number | null; why: string[]; watch: ReportCall[] }
+  holdings: ReportHolding[]
+  alsangmu?: { date: string; show: string; headline: string } | null
+  review?: { date: string; call: string; result: string }[]
 }
 
 // 서버가 준 오류 메시지 (없으면 상태 코드)
@@ -66,6 +81,8 @@ export const getStocks = (): Promise<Stock[]> => fetch('/api/stocks').then(r => 
 export const getQuotes = () => json<Quote[]>('/api/quotes', [])
 export const getIndicators = () => json<Indicator[]>('/api/indicators', [])
 export const getNote = () => json<Note | null>('/views/alsangmu.json', null)
+export const getShuka = () => json<{ name: string; source: string; asOf: string; aliases?: Record<string, string>; daily: Daily[] } | null>('/views/shuka.json', null)
+export const getReports = () => json<{ reports: Report[] } | null>('/views/report.json', null)
 export const getOrderbook = (code: string) => json<Orderbook | null>('/api/orderbook' + sym(code), null)
 export const getTrades = (code: string) => json<Trade[] | null>('/api/trades' + sym(code), null)
 export const getInvestors = (code: string) => json<InvestorFlow[]>('/api/investors' + sym(code), [])
