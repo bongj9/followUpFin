@@ -43,33 +43,33 @@ export function AlsangmuView({ code, stocks, tick }: { code: string | null; stoc
           <span>{said?.summary ?? '영상에서 이 종목을 따로 다룬 적은 없어요. 차트 규칙만 대입'}</span>
           <span className="ml-auto text-link whitespace-nowrap">자세히 ↓</span>
         </div>
-      : <Today note={note} />}
+      : <Today daily={note.daily ?? []} who="알상무" className="[grid-area:today] bg-[linear-gradient(180deg,var(--color-primary-soft),var(--color-card)_160px)]" />}
     <View ref={viewRef} note={note} m={m} code={code} name={name} />
   </>
 }
 
-// 알상무 오늘의 뷰: 가장 최근 영상 하나를 크게, 지난 날은 접어 둔다
-// 영상 한 편씩 요약한 daily(최신이 앞, 아침 당일전략 · 저녁 지표추적자 · 금요일 RTS). 근거 링크는 그 영상의 해당 분으로 간다
-function Today({ note }: { note: Note }) {
-  const [day, ...past] = note.daily ?? []
+// 오늘의 뷰: 가장 최근 영상 하나를 크게, 지난 날은 접어 둔다 (알상무·슈카 공용)
+// 영상 한 편씩 요약한 daily(최신이 앞, 알상무는 당일전략·지표추적자·RTS, 슈카는 슈황). 근거 링크는 그 영상의 해당 분으로 간다
+export function Today({ daily, who, className, chartTitle = '차트를 이렇게 봤다', oddsLabel = '확률' }: { daily: Daily[]; who: string; className: string; chartTitle?: string; oddsLabel?: string }) {
+  const [day, ...past] = daily
   if (!day) return null
   const cite = (d: Daily, t: string) => <a className="cite" target="_blank" rel="noopener" href={yt(d.id, t)}>{'▶ ' + t}</a>
   const list = (d: Daily, items: Cited[]) => <ul>{items.map((r, k) => <li key={k}>{r.text}{cite(d, r.cite)}</li>)}</ul>
   const label = (d: Daily) => new Date(d.date + 'T00:00:00').toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })
-  const ago = Math.round((Date.now() - +new Date(day.date + 'T00:00:00')) / 864e5)
+  const ago = Math.floor((Date.now() - +new Date(day.date + 'T00:00:00')) / 864e5)
   const h3 = 'text-[15px] font-bold mt-[18px] mb-1.5'
   return (
-    <Card className="[grid-area:today] prose-list text-[13px] leading-[1.6] bg-[linear-gradient(180deg,var(--color-primary-soft),var(--color-card)_160px)]">
+    <Card className={'prose-list text-[13px] leading-[1.6] ' + className}>
       <div className="inline-block text-xs font-bold text-primary bg-card px-2.5 py-[3px] rounded-full">
-        {`알상무의 오늘 뷰 · ${label(day)} ${day.show ?? '지표추적자'}`}
+        {`${who}의 오늘 뷰 · ${label(day)} ${day.show ?? ''}`}
         {ago > 1 && <span className="text-warn font-normal ml-1.5">{`(${ago}일 전 영상, 새 영상 아직 없음)`}</span>}
       </div>
       <div className="text-xl font-extrabold leading-[1.4] tracking-[-0.03em] mt-2.5 mb-3">{day.headline}</div>
       <div className="flex gap-1.5 flex-wrap mb-2">
-        {([['현금', day.stance?.cash], ['확률', day.stance?.odds], ['행동', day.stance?.action]] as const).filter(([, v]) => v).map(([k, v]) =>
+        {([['현금', day.stance?.cash], [oddsLabel, day.stance?.odds], ['행동', day.stance?.action]] as const).filter(([, v]) => v).map(([k, v]) =>
           <span key={k} className="px-3 py-1 rounded-full bg-card text-xs font-semibold shadow-[0_0_0_1px_var(--color-border)]">{`${k} · ${v}`}</span>)}
       </div>
-      <h3 className={h3}>차트를 이렇게 봤다</h3>{list(day, day.chart ?? [])}
+      <h3 className={h3}>{chartTitle}</h3>{list(day, day.chart ?? [])}
       <h3 className={h3}>그 밖에</h3>{list(day, day.points ?? [])}
       {!!day.levels?.length && <>
         <h3 className={h3}>그가 말한 코스피 레벨</h3>
@@ -100,6 +100,14 @@ function View({ ref, note, m, code, name }: { ref: Ref<HTMLElement>; note: Note;
   // 레버리지 ETF는 기초 종목 언급을 보여준다
   const base = code ? note.aliases?.[code] : undefined
   const said = code ? note.stocks?.[base ?? code] : undefined
+  // 종목 언급: 노트 정리(stocks, 'MMDD m:ss') + 아직 정리에 안 들어간 방송(RTS·당일전략 등 daily)의 언급. 최근 영상이 위로
+  // ponytail: MMDD로만 정렬해서 12월→1월을 넘기면 순서가 뒤집힌다. 노트에 연도가 들어가면 그걸로
+  const known = new Set(Object.values(note.videos))
+  const items = code ? [
+    ...(said?.items ?? []).map(r => { const [day, time] = r.cite.split(' '); return { text: r.text, day, time, id: note.videos[day] } }),
+    ...(note.daily ?? []).filter(d => !known.has(d.id)).flatMap(d => (d.stocks?.[base ?? code] ?? [])
+      .map(r => ({ text: r.text, day: d.date.slice(5, 7) + d.date.slice(8), time: r.cite, id: d.id }))),
+  ].sort((a, b) => b.day.localeCompare(a.day)) : []
   const own = code ? said?.levels ?? [] : note.levels
   const levels = [...own.map(l => ({ ...l, here: false })), { price: m.price, here: true, text: '', cite: '' }].sort((a, b) => b.price - a.price)
   return (
@@ -122,11 +130,12 @@ function View({ ref, note, m, code, name }: { ref: Ref<HTMLElement>; note: Note;
           </div>
         )
       })}
-      {!!said?.items?.length && <div className={stepRow}>
+      {!!items.length && <div className={stepRow}>
         <b>그가 이 종목에 대해 한 말</b>
-        <ul>{said.items.map((r, k) => <li key={k}>{r.text}{cite(r.cite)}</li>)}</ul>
+        <ul>{items.map((r, k) => <li key={k}>{r.text}
+          <a className="cite" href={yt(r.id, r.time)} target="_blank" rel="noopener">{`▶ ${r.day.slice(0, 2)}/${r.day.slice(2)} ${r.time}`}</a></li>)}</ul>
       </div>}
-      {code && !said && <div className="text-muted-foreground text-xs">영상 20편에서 이 종목을 따로 다룬 부분은 없어요.</div>}
+      {code && !items.length && <div className="text-muted-foreground text-xs">영상 20편에서 이 종목을 따로 다룬 부분은 없어요.</div>}
       {!!own.length && <div className={stepRow}>
         <b>⑥ 그가 말한 레벨</b>
         <div className="my-1.5 flex flex-col gap-0.5">

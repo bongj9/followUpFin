@@ -4,7 +4,9 @@ import { AlsangmuView } from '@/components/AlsangmuView'
 import { Feed } from '@/components/Feed'
 import { FlowChart } from '@/components/FlowChart'
 import { Investors } from '@/components/Investors'
+import { MorningReport } from '@/components/MorningReport'
 import { OrderBook } from '@/components/OrderBook'
+import { ShukaView } from '@/components/ShukaView'
 import { StockChart } from '@/components/StockChart'
 import { StockHead } from '@/components/StockHead'
 import { Ticker } from '@/components/Ticker'
@@ -89,8 +91,10 @@ export default function App() {
           ? <StockPage key={code} code={code} stocks={stocks} quotes={quotes} tick={tick} select={select} />
           : <>
               <Watchlist className="[grid-area:watch]" stocks={stocks} quotes={quotes} selected={selected} select={select} refresh={refresh} />
+              <MorningReport tick={tick} />
               <FlowChart className="[grid-area:flow]" tick={tick} />
               <AlsangmuView code={null} stocks={stocks} tick={tick} />
+              <ShukaView code={null} tick={tick} />
               <Feed className="[grid-area:feed]" selected={selected} tick={tick} select={select} />
             </>}
       </main>
@@ -106,6 +110,7 @@ function StockPage({ code, stocks, quotes, tick, select }: { code: string; stock
       <StockHead className="[grid-area:head]" code={code} stock={stocks.find(s => s.stockCode === code)} quote={quote} select={select} />
       <Card className="[grid-area:chart]"><StockChart code={code} stocks={stocks} /></Card>
       <AlsangmuView code={code} stocks={stocks} tick={tick} />
+      <ShukaView code={code} tick={tick} />
       {/* 차트를 내려 봐도 뉴스는 옆에 남는다 */}
       <Feed className="[grid-area:feed] min-[1101px]:sticky min-[1101px]:top-4 min-[1101px]:max-h-[calc(100vh-32px)] min-[1101px]:overflow-y-auto"
         selected={{ stockCode: code }} tick={tick} select={select} />
