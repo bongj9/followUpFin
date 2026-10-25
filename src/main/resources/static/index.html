@@ -13,17 +13,29 @@
   h1 { font-size: 18px; margin: 0; }
   #updated { color: var(--muted); font-size: 13px; }
   /* 두 페이지. 홈: 관심종목 | 뉴스·공시 / 종목(main.page-stock): 헤더, 차트 | 이 종목 뉴스·공시, 아래 투자자·호가·체결 */
-  main { display: grid; grid-template-columns: 280px minmax(0, 1fr); grid-template-areas: "watch flow" "watch view" "watch feed"; gap: 16px; padding: 16px 20px; max-width: 1440px; margin: 0 auto; align-items: start; }
+  main { display: grid; grid-template-columns: 280px minmax(0, 1fr); grid-template-areas: "watch today" "watch flow" "watch view" "watch feed"; gap: 16px; padding: 16px 20px; max-width: 1440px; margin: 0 auto; align-items: start; }
   #watch { grid-area: watch; align-self: start; } #feedBox { grid-area: feed; } #flowBox { grid-area: flow; }
   main.page-stock #flowBox { display: none; }
   #viewBox { grid-area: view; font-size: 13px; }
+  /* 알상무 오늘의 뷰: 가장 최근 영상 하나를 크게, 지난 날은 접어 둔다 */
+  #todayBox { grid-area: today; font-size: 13px; border-left: 4px solid #2563eb; }
+  #todayBox[hidden], main.page-stock #todayBox { display: none; }
+  #todayBox .date { font-size: 12px; font-weight: 700; color: #2563eb; }
+  #todayBox .stale { color: #9a3412; font-weight: 400; margin-left: 6px; }
+  #todayBox .headline { font-size: 16px; font-weight: 700; margin: 4px 0 8px; }
+  #todayBox .stance { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  #todayBox .stance span { padding: 2px 10px; border-radius: 999px; background: var(--bg); font-size: 12px; }
+  #todayBox h3 { font-size: 13px; margin: 10px 0 4px; }
+  #todayBox ul { margin: 0; padding-left: 18px; } #todayBox li { margin-bottom: 4px; }
+  #todayBox a.cite { font-size: 11px; color: #2563eb; text-decoration: none; white-space: nowrap; margin-left: 4px; }
+  #todayBox details { margin-top: 10px; } #todayBox summary { cursor: pointer; font-weight: 600; }
   #viewBox[hidden] { display: none; }
   /* 종목 페이지 맨 위 한 줄 요약. 뷰 본문은 차트 아래라 스크롤해야 보여서 */
   #viewPeek { grid-area: peek; display: none; font-size: 13px; padding: 10px 14px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; cursor: pointer; }
   main.page-stock #viewPeek:not([hidden]) { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
   #viewPeek .tag { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: #fff; border: 1px solid #bfdbfe; }
   #viewPeek .more { margin-left: auto; color: #2563eb; white-space: nowrap; }
-  #viewBox h2 { margin: 0; } #viewBox .sub { color: var(--muted); font-size: 12px; }
+  #viewBox h2 { margin: 0; } #viewBox .sub, #todayBox .sub { color: var(--muted); font-size: 12px; }
   #viewBox .summary { margin: 8px 0 12px; padding: 8px 10px; background: var(--bg); border-radius: 8px; }
   #viewBox .step { display: grid; grid-template-columns: 150px 1fr; gap: 4px 12px; padding: 8px 0; border-top: 1px solid #f1f3f5; }
   #viewBox .step .now { font-weight: 700; }
@@ -49,7 +61,7 @@
   main.page-stock #feedBox { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; } /* 차트를 내려 봐도 뉴스는 옆에 남는다 */
   #below { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; align-items: start; }
   @media (max-width: 1100px) { main.page-stock { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "peek" "chart" "view" "feed" "below"; } main.page-stock #feedBox { position: static; max-height: none; } }
-  @media (max-width: 720px) { main { grid-template-columns: minmax(0, 1fr); grid-template-areas: "watch" "flow" "view" "feed"; padding: 12px 16px; } header { padding: 12px 16px; gap: 8px; } #updated { display: none; } }
+  @media (max-width: 720px) { main { grid-template-columns: minmax(0, 1fr); grid-template-areas: "watch" "today" "flow" "view" "feed"; padding: 12px 16px; } header { padding: 12px 16px; gap: 8px; } #updated { display: none; } }
   .up { color: #dc2626; } .down { color: #2563eb; }
   /* 상단 지표 띠: 같은 목록을 두 번 이어 붙이고 절반만큼 왼쪽으로 흘려서 끊김 없이 돈다. 마우스를 올리면 멈춘다 */
   #ticker { overflow: hidden; background: var(--card); border-bottom: 1px solid var(--line); }
@@ -214,6 +226,7 @@
     <div id="flowSummary"></div>
     <div id="flowChart"></div>
   </section>
+  <section id="todayBox" hidden></section>
   <section id="viewBox" hidden></section>
   <section id="feedBox">
     <h2 id="feedTitle">전체 뉴스·공시</h2>
@@ -1163,6 +1176,7 @@
     const peek = document.getElementById('viewPeek');
     peek.hidden = box.hidden = !note || !bars || bars.length < 121;
     if (box.hidden) return;
+    if (code === 'KOSPI') renderToday(note);
     const name = code === 'KOSPI' ? '코스피' : stockList.find(x => x.stockCode === code)?.name ?? code;
     const m = marketState(bars, flows.length >= 21 ? flows : null);
     renderView(box, note, m, code, name);
@@ -1203,6 +1217,34 @@
     st.bb = c[i] < lo[i] && lo[i] < lo[i - 1] ? 'outsideLow' : c[i] > up[i] ? 'outsideHigh' : b.low <= lo[i] || c[i] < lo[i] ? 'touchLow' : 'inside';
     fact.bb = `하단 ${fmt(lo[i])} · 상단 ${fmt(up[i])} · 종가는 하단 대비 ${pct(c[i], lo[i]).toFixed(1)}%`;
     return { st, fact, price: c[i], date: new Date((b.time - KST) * 1000).toLocaleDateString('ko-KR') };
+  }
+
+  // 영상 한 편씩 요약한 daily(최신이 앞). 근거 링크는 그 영상의 해당 분으로 간다
+  function renderToday(note) {
+    const box = document.getElementById('todayBox');
+    const [day, ...past] = note.daily ?? [];
+    box.hidden = !day;
+    if (!day) return;
+    const cite = (d, t) => el('a', { className: 'cite', target: '_blank', rel: 'noopener', textContent: '▶ ' + t,
+      href: `https://www.youtube.com/watch?v=${d.id}&t=${t.split(':').reduce((a, v) => a * 60 + +v, 0)}s` });
+    const list = (d, items) => el('ul', {}, ...items.map(r => el('li', {}, r.text, cite(d, r.cite))));
+    const label = d => new Date(d.date + 'T00:00:00').toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' });
+    const ago = Math.round((Date.now() - new Date(day.date + 'T00:00:00')) / 864e5);
+    box.replaceChildren(
+      el('div', { className: 'date' }, `알상무의 오늘 뷰 · ${label(day)} 지표추적자`,
+        ago > 1 ? el('span', { className: 'stale', textContent: `(${ago}일 전 영상, 새 영상 아직 없음)` }) : ''),
+      el('div', { className: 'headline', textContent: day.headline }),
+      el('div', { className: 'stance' }, ...[['현금', day.stance?.cash], ['확률', day.stance?.odds], ['행동', day.stance?.action]]
+        .filter(([, v]) => v).map(([k, v]) => el('span', { textContent: `${k} · ${v}` }))),
+      el('h3', { textContent: '차트를 이렇게 봤다' }), list(day, day.chart ?? []),
+      el('h3', { textContent: '그 밖에' }), list(day, day.points ?? []),
+      ...(day.levels?.length ? [el('h3', { textContent: '그가 말한 코스피 레벨' }),
+        el('ul', {}, ...[...day.levels].sort((a, b) => b.price - a.price).map(l => el('li', {}, el('b', { textContent: fmt(l.price) + ' ' }), l.text, cite(day, l.cite))))] : []),
+      el('div', { className: 'sub', textContent: `영상: ${day.title} · 그의 말을 요약한 것이고, 투자 판단은 본인 몫이에요` },
+        el('a', { className: 'cite', href: `https://www.youtube.com/watch?v=${day.id}`, target: '_blank', rel: 'noopener', textContent: '▶ 영상 보기' })),
+      ...(past.length ? [el('details', {}, el('summary', { textContent: `지난 뷰 ${past.length}개` }),
+        ...past.map(d => el('details', {}, el('summary', { textContent: `${label(d)} · ${d.headline}` }),
+          list(d, [...(d.chart ?? []), ...(d.points ?? [])]))))] : []));
   }
 
   function renderView(box, note, m, code, name) {
