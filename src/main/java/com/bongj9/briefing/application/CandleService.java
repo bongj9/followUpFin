@@ -13,6 +13,7 @@ import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.LongUnaryOperator;
 
@@ -26,6 +27,9 @@ public class CandleService {
     // 받아올 일봉 수: 주봉 약 2년, 월봉 약 8년, 년봉 최대 약 24년
     private static final Map<String, Integer> DAYS = Map.of("1d", 200, "1w", 600, "1M", 2000, "1y", 6000);
     private static final int MAX_MINUTE_CANDLES = 2000;
+    // 코스피·코스닥 지수는 시장 지표 경로로 받는다
+    // ponytail: 지수는 한 번에 200봉까지만 (일봉 약 10개월, 1분봉 약 3시간). 더 길게 보려면 nextBefore로 이어 받을 것
+    private static final Set<String> INDEXES = Set.of("KOSPI", "KOSDAQ");
 
     private final MarketData market;
 
@@ -41,7 +45,7 @@ public class CandleService {
     public List<Bar> bars(String symbol, String interval) {
         Integer days = DAYS.get(interval);
         if (days != null) {
-            List<Bar> daily = market.dailyCandles(symbol, days).stream()
+            List<Bar> daily = (INDEXES.contains(symbol) ? market.indicatorCandles(symbol, "1d", days) : market.dailyCandles(symbol, days)).stream()
                     .map(c -> bar(c.time().atZone(KST).toLocalDate().toEpochSecond(LocalTime.MIDNIGHT, ZoneOffset.UTC), c))
                     .toList();
             return merge(daily, t -> periodStart(interval, LocalDate.ofEpochDay(t / 86400))
@@ -52,7 +56,8 @@ public class CandleService {
             throw new IllegalArgumentException("지원하지 않는 주기: " + interval);
         }
         // ponytail: 1분봉 최대 2000개까지만 합친다. 1시간봉이면 30여 개. 더 길게 보려면 캐시를 두고 늘릴 것
-        List<Bar> mins = market.minuteCandles(symbol, Math.min(minutes * 200, MAX_MINUTE_CANDLES)).stream()
+        int count = Math.min(minutes * 200, MAX_MINUTE_CANDLES);
+        List<Bar> mins = (INDEXES.contains(symbol) ? market.indicatorCandles(symbol, "1m", count) : market.minuteCandles(symbol, count)).stream()
                 .map(c -> bar(c.time().getEpochSecond() - 60 + KST_SECONDS, c)) // 끝 시각 → 시작 시각
                 .toList();
         long size = minutes * 60L;
