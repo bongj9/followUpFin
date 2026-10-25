@@ -12,8 +12,10 @@
 ```bash
 cp secret.example.yml secret.yml   # 발급받은 API 키 입력 (git에 올라가지 않음)
 docker compose up -d               # PostgreSQL
-./gradlew bootRun
+./gradlew bootRun                  # 화면(frontend/)도 npm으로 빌드해서 함께 띄운다 (Node 필요)
 ```
+
+화면만 고칠 때는 bootRun(8080)을 켜 둔 채로 `cd frontend && npm run dev` → http://localhost:5173 (API·SSE는 8080으로 넘긴다, 저장하면 바로 반영). 지표 계산 테스트는 `npm test`.
 
 H2(`./data/briefing`)를 쓰던 예전 버전의 관심종목·뉴스는 PostgreSQL로 옮겨지지 않는다. 종목은 다시 추가하면 뉴스는 다음 수집 때 다시 쌓인다.
 
@@ -24,7 +26,7 @@ http://localhost:8080
 
 ## 스택
 
-Java 21 · Spring Boot 4 · Spring Data JPA · PostgreSQL (테스트는 H2) · Vanilla JS
+Java 21 · Spring Boot 4 · Spring Data JPA · PostgreSQL (테스트는 H2) · React 19 · TypeScript · Vite · Tailwind CSS · shadcn/ui · Lightweight Charts
 
 ## 다음 단계
 

@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+/* 토스 느낌: 회색 바탕 위 테두리 없는 흰 카드, 부드러운 그림자, 파란 포인트. 한국식 상승 빨강·하락 파랑 */
+@theme {
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --color-background: #f2f4f6;
+  --color-foreground: #191f28;
+  --color-card: #fff;
+  --color-card-foreground: #191f28;
+  --color-muted: #f2f4f6;
+  --color-muted-foreground: #8b95a1;
+  --color-border: #e5e8eb;
+  --color-input: #f2f4f6;
+  --color-ring: #3182f6;
+  --color-primary: #3182f6;
+  --color-primary-foreground: #fff;
+  --color-primary-soft: #e8f3ff;
+  --color-secondary: #f2f4f6;
+  --color-secondary-foreground: #191f28;
+  --color-accent: #f2f4f6;
+  --color-accent-foreground: #191f28;
+  --color-up: #dc2626;
+  --color-down: #2563eb;
+  --color-link: #2563eb;
+  --color-news: #0f766e;
+  --color-disc: #b45309;
+  --color-market: #4f46e5;
+  --color-warn: #9a3412;
+  --color-warn-soft: #fff7ed;
+  --radius-card: 20px;
+  --shadow-card: 0 1px 2px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.04);
+}
+
+body { line-height: normal; letter-spacing: -0.01em; -webkit-font-smoothing: antialiased; @apply bg-background text-foreground font-sans; }
+.up { color: var(--color-up); } .down { color: var(--color-down); }
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* 상단 지표 띠: 같은 목록을 두 번 이어 붙이고 절반만큼 왼쪽으로 흘려서 끊김 없이 돈다. 마우스를 올리면 멈춘다 */
+.ticker .track { display: flex; width: max-content; animation: ticker 40s linear infinite; }
+.ticker:hover .track { animation-play-state: paused; }
+@keyframes ticker { to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .ticker { overflow-x: auto; } .ticker .track { animation: none; } .ticker .track > .copy { display: none; } }
+
+/* 잔량 막대: 매도는 가운데(가격)쪽에서 왼쪽으로, 매수는 오른쪽으로 자란다 */
+.lvl.ask .vol { justify-content: flex-end; background: linear-gradient(to left, rgba(37,99,235,0.15) var(--w), transparent var(--w)); }
+.lvl.bid .vol { background: linear-gradient(to right, rgba(220,38,38,0.15) var(--w), transparent var(--w)); }
+
+.chart-box:fullscreen { background: var(--color-card); padding: 16px; display: flex; flex-direction: column; }
+.chart-box:fullscreen .chart-wrap { flex: 1; height: auto !important; }
+
+/* 알상무 뷰·피드 본문의 목록·근거 링크 */
+.prose-list ul { margin: 0; padding-left: 18px; list-style: disc; } .prose-list li { margin-bottom: 4px; }
+.prose-list summary { cursor: pointer; font-weight: 600; } .prose-list details { margin-top: 10px; }
+a.cite { font-size: 11px; color: var(--color-link); text-decoration: none; white-space: nowrap; margin-left: 4px; }
+
+/* 페이지 격자. 홈: 관심종목 | 오늘 뷰·수급·뷰·피드 / 종목: 헤더, 요약, 차트·뷰·아래칸 | 피드 */
+.page-home { grid-template-columns: 280px minmax(0, 1fr); grid-template-areas: "watch today" "watch flow" "watch view" "watch feed"; }
+.page-stock { grid-template-columns: minmax(0, 1fr) 380px; grid-template-areas: "head head" "peek peek" "chart feed" "view feed" "below feed"; }
+@media (max-width: 1100px) { .page-stock { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "peek" "chart" "view" "feed" "below"; } }
+@media (max-width: 720px) { .page-home { grid-template-columns: minmax(0, 1fr); grid-template-areas: "watch" "today" "flow" "view" "feed"; } }
