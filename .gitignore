@@ -46,3 +46,4 @@ src/main/resources/static/views/
 ### frontend ###
 frontend/node_modules/
 frontend/dist/
+frontend/*.tsbuildinfo
