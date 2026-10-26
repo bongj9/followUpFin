@@ -27,3 +27,6 @@ spring:
 briefing:
   poll-interval: PT10M
   big-move-percent: 5 # 전일 대비 이 이상 오르거나 내리면 강조
+
+server:
+  address: ${SERVER_ADDRESS:127.0.0.1} # 보유 수량(/api/holdings)이 같은 와이파이에 열리지 않게. 서버에 올릴 땐 SERVER_ADDRESS=0.0.0.0 (+ 인증)
