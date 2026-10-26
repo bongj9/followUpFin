@@ -32,6 +32,7 @@ cd $R/frontend && npx tsx scripts/report-facts.ts > <scratchpad>/facts.json
 
 - `alsangmu.json`의 `daily[0]`(날짜·방송·headline·stance 현금·levels·stocks), `rules`(비중 규칙), `stocks[코드]`(레버리지 ETF는 `aliases`로 기초 종목을 찾는다)
 - 슈카 노트 `~/.claude/skills/alsangmu-update/web/views/shuka.json`(없으면 건너뜀)의 `daily[0]`과 보유 종목·코스피에 대한 `daily[].stocks` 언급. 국장 분위기를 보는 두 번째 시각으로 쓰고, 알상무와 엇갈리면 그렇다고 쓴다
+- 위폴 노트 `~/.claude/skills/alsangmu-update/web/views/wepoll.json`(없으면 건너뜀)의 `daily[0]`(진행자의 간밤 미국장 뷰와 `guest` 게스트 이름·주장)과 보유 종목 언급. 미국·반도체를 보는 세 번째 시각으로 쓴다. 방송이 07:00~08:30이라 아침 실행 땐 전날 편일 수 있으니 날짜를 적는다
 - 기존 `report.json`이 있으면 최근 리포트들의 `watch` 조건과 `action`을 오늘 종가와 비교해 채점할 거리를 찾는다
 
 ## 4. 판단 쓰기

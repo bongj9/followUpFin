@@ -75,6 +75,11 @@ export function Today({ daily, who, className, chartTitle = '차트를 이렇게
         <h3 className={h3}>그가 말한 코스피 레벨</h3>
         <ul>{[...day.levels].sort((a, b) => b.price - a.price).map((l, k) => <li key={k}><b>{fmt(l.price) + ' '}</b>{l.text}{cite(day, l.cite)}</li>)}</ul>
       </>}
+      {day.guest && <>
+        <h3 className={h3}>{`게스트 · ${day.guest.name}${day.guest.firm ? ` (${day.guest.firm})` : ''}`}</h3>
+        <div className="font-semibold mb-1">{day.guest.headline}</div>
+        {list(day, day.guest.points)}
+      </>}
       <div className="text-muted-foreground text-xs">
         {`영상: ${day.title} · 그의 말을 요약한 것이고, 투자 판단은 본인 몫이에요`}
         <a className="cite" href={yt(day.id)} target="_blank" rel="noopener">▶ 영상 보기</a>
@@ -84,6 +89,7 @@ export function Today({ daily, who, className, chartTitle = '차트를 이렇게
         {past.map(d => <details key={d.date + d.id}>
           <summary>{`${label(d)} ${d.show ?? ''} · ${d.headline}`}</summary>
           {list(d, [...(d.chart ?? []), ...(d.points ?? [])])}
+          {d.guest && <><div className="font-semibold mt-1">{`게스트 ${d.guest.name}: ${d.guest.headline}`}</div>{list(d, d.guest.points)}</>}
         </details>)}
       </details>}
     </Card>
