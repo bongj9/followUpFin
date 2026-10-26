@@ -7,6 +7,7 @@ import { Investors } from '@/components/Investors'
 import { MorningReport } from '@/components/MorningReport'
 import { OrderBook } from '@/components/OrderBook'
 import { ShowView } from '@/components/ShowView'
+import { ViewsBoard } from '@/components/ViewsBoard'
 import { StockChart } from '@/components/StockChart'
 import { StockHead } from '@/components/StockHead'
 import { Ticker } from '@/components/Ticker'
@@ -91,11 +92,10 @@ export default function App() {
           ? <StockPage key={code} code={code} stocks={stocks} quotes={quotes} tick={tick} select={select} />
           : <>
               <Watchlist className="[grid-area:watch]" stocks={stocks} quotes={quotes} selected={selected} select={select} refresh={refresh} />
+              <ViewsBoard tick={tick} />
               <MorningReport tick={tick} />
               <FlowChart className="[grid-area:flow]" tick={tick} />
               <AlsangmuView code={null} stocks={stocks} tick={tick} />
-              <ShowView show="shuka" code={null} tick={tick} />
-              <ShowView show="wepoll" code={null} tick={tick} />
               <Feed className="[grid-area:feed]" selected={selected} tick={tick} select={select} />
             </>}
       </main>

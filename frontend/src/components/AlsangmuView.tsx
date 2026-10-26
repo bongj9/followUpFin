@@ -1,17 +1,17 @@
 import { useEffect, useRef, useState, type Ref } from 'react'
-import { getBars, getFlows, getNote, isKoreanCode, type Bar, type Cited, type Daily, type MarketFlow, type Note, type Stock } from '@/api'
+import { getBars, getFlows, getNote, isKoreanCode, type Bar, type MarketFlow, type Note, type Stock } from '@/api'
 import { Card } from '@/components/ui/card'
 import { fmt } from '@/lib/format'
 import { marketState, type MarketState } from '@/lib/indicators'
 
 const sec = (t: string) => t.split(':').reduce((a, v) => a * 60 + +v, 0)
-const yt = (id: string, t?: string) => `https://www.youtube.com/watch?v=${id}` + (t ? `&t=${sec(t)}s` : '')
+export const yt = (id: string, t?: string) => `https://www.youtube.com/watch?v=${id}` + (t ? `&t=${sec(t)}s` : '')
 const tag = 'text-xs font-semibold px-2.5 py-0.5 rounded-full bg-white text-primary'
 
 // 투자 관점 노트(views/*.json, git 제외: 실존 인물 영상 요약이라 공개 저장소에 안 올린다)를 지금 코스피에 대입한다
 // 노트가 없으면 섹션을 숨긴다. 그가 지금 이렇게 말한 게 아니라 그의 규칙을 지금 데이터에 맞춰 보여주는 것
 // 종목 페이지에선 같은 차트 규칙을 그 종목 일봉에 대입한다. 외국인 수급은 코스피 전체 것만 있어서 국내 종목에만 붙인다
-// 홈(code null)은 오늘 뷰 + 뷰, 종목 페이지는 맨 위 한 줄 요약 + 뷰. 각자 격자 칸(today·peek·view)에 들어간다
+// 홈(code null)은 뷰만, 종목 페이지는 맨 위 한 줄 요약 + 뷰. 각자 격자 칸(peek·view)에 들어간다
 export function AlsangmuView({ code, stocks, tick }: { code: string | null; stocks: Stock[]; tick: number }) {
   const target = code ?? 'KOSPI'
   const [data, setData] = useState<{ note: Note; bars: Bar[]; flows: MarketFlow[] } | null>(null)
@@ -43,57 +43,9 @@ export function AlsangmuView({ code, stocks, tick }: { code: string | null; stoc
           <span>{said?.summary ?? '영상에서 이 종목을 따로 다룬 적은 없어요. 차트 규칙만 대입'}</span>
           <span className="ml-auto text-link whitespace-nowrap">자세히 ↓</span>
         </div>
-      : <Today daily={note.daily ?? []} who="알상무" className="[grid-area:today] bg-[linear-gradient(180deg,var(--color-primary-soft),var(--color-card)_160px)]" />}
+      : null /* 홈의 오늘 방송 요약은 ViewsBoard */}
     <View ref={viewRef} note={note} m={m} code={code} name={name} />
   </>
-}
-
-// 오늘의 뷰: 가장 최근 영상 하나를 크게, 지난 날은 접어 둔다 (알상무·슈카 공용)
-// 영상 한 편씩 요약한 daily(최신이 앞, 알상무는 당일전략·지표추적자·RTS, 슈카는 슈황). 근거 링크는 그 영상의 해당 분으로 간다
-export function Today({ daily, who, className, chartTitle = '차트를 이렇게 봤다', oddsLabel = '확률' }: { daily: Daily[]; who: string; className: string; chartTitle?: string; oddsLabel?: string }) {
-  const [day, ...past] = daily
-  if (!day) return null
-  const cite = (d: Daily, t: string) => <a className="cite" target="_blank" rel="noopener" href={yt(d.id, t)}>{'▶ ' + t}</a>
-  const list = (d: Daily, items: Cited[]) => <ul>{items.map((r, k) => <li key={k}>{r.text}{cite(d, r.cite)}</li>)}</ul>
-  const label = (d: Daily) => new Date(d.date + 'T00:00:00').toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })
-  const ago = Math.floor((Date.now() - +new Date(day.date + 'T00:00:00')) / 864e5)
-  const h3 = 'text-[15px] font-bold mt-[18px] mb-1.5'
-  return (
-    <Card className={'prose-list text-[13px] leading-[1.6] ' + className}>
-      <div className="inline-block text-xs font-bold text-primary bg-card px-2.5 py-[3px] rounded-full">
-        {`${who}의 오늘 뷰 · ${label(day)} ${day.show ?? ''}`}
-        {ago > 1 && <span className="text-warn font-normal ml-1.5">{`(${ago}일 전 영상, 새 영상 아직 없음)`}</span>}
-      </div>
-      <div className="text-xl font-extrabold leading-[1.4] tracking-[-0.03em] mt-2.5 mb-3">{day.headline}</div>
-      <div className="flex gap-1.5 flex-wrap mb-2">
-        {([['현금', day.stance?.cash], [oddsLabel, day.stance?.odds], ['행동', day.stance?.action]] as const).filter(([, v]) => v).map(([k, v]) =>
-          <span key={k} className="px-3 py-1 rounded-full bg-card text-xs font-semibold shadow-[0_0_0_1px_var(--color-border)]">{`${k} · ${v}`}</span>)}
-      </div>
-      <h3 className={h3}>{chartTitle}</h3>{list(day, day.chart ?? [])}
-      <h3 className={h3}>그 밖에</h3>{list(day, day.points ?? [])}
-      {!!day.levels?.length && <>
-        <h3 className={h3}>그가 말한 코스피 레벨</h3>
-        <ul>{[...day.levels].sort((a, b) => b.price - a.price).map((l, k) => <li key={k}><b>{fmt(l.price) + ' '}</b>{l.text}{cite(day, l.cite)}</li>)}</ul>
-      </>}
-      {day.guest && <>
-        <h3 className={h3}>{`게스트 · ${day.guest.name}${day.guest.firm ? ` (${day.guest.firm})` : ''}`}</h3>
-        <div className="font-semibold mb-1">{day.guest.headline}</div>
-        {list(day, day.guest.points)}
-      </>}
-      <div className="text-muted-foreground text-xs">
-        {`영상: ${day.title} · 그의 말을 요약한 것이고, 투자 판단은 본인 몫이에요`}
-        <a className="cite" href={yt(day.id)} target="_blank" rel="noopener">▶ 영상 보기</a>
-      </div>
-      {!!past.length && <details>
-        <summary>{`지난 뷰 ${past.length}개`}</summary>
-        {past.map(d => <details key={d.date + d.id}>
-          <summary>{`${label(d)} ${d.show ?? ''} · ${d.headline}`}</summary>
-          {list(d, [...(d.chart ?? []), ...(d.points ?? [])])}
-          {d.guest && <><div className="font-semibold mt-1">{`게스트 ${d.guest.name}: ${d.guest.headline}`}</div>{list(d, d.guest.points)}</>}
-        </details>)}
-      </details>}
-    </Card>
-  )
 }
 
 const stepRow = 'grid grid-cols-[150px_1fr] max-[720px]:grid-cols-1 gap-x-3 gap-y-1 py-3 border-t border-muted'

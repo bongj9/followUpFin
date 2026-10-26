@@ -49,11 +49,17 @@ export const midRange = (bars: Bar[], n: number): Series => bars.map((_, i) => {
 // k > 0: k봉 앞으로 밀기 (선행), k < 0: 뒤로 당기기 (후행)
 export const shift = (vals: Series, k: number): Series => vals.map((_, i) => vals[i - k] ?? null)
 
+// 일목 선행스팬: 26봉 앞에 그린다. 길이 = 봉 수 + 26 (뒤 26개가 아직 안 온 미래 자리)
+const lead = (vals: Series): Series => [...Array<null>(26).fill(null), ...vals]
+export const spanA = (b: Bar[]) => { const t = midRange(b, 9), k = midRange(b, 26); return lead(t.map((v, i) => v == null || k[i] == null ? null : (v + k[i]!) / 2)) }
+export const spanB = (b: Bar[]) => lead(midRange(b, 52))
+
 export type Toned = { value: number; color: string }
 const tone = (v: number, up: boolean): Toned => ({ value: v, color: up ? 'rgba(220,38,38,0.4)' : 'rgba(37,99,235,0.4)' })
 
 // 보조지표. pane: 아래 별도 칸. lines의 label은 범례에 색깔 숫자로 표시. hist: 막대(히스토그램) 시리즈
-export interface IndicatorLine { label?: string; color?: string; hist?: boolean; options?: object; calc: (b: Bar[]) => (number | Toned | null)[] }
+// ahead: calc가 마지막 봉 뒤로 ahead봉만큼 더 낸다 (일목 선행스팬은 26봉 앞까지 그린다)
+export interface IndicatorLine { label?: string; color?: string; hist?: boolean; ahead?: number; options?: object; calc: (b: Bar[]) => (number | Toned | null)[] }
 export interface IndicatorDef { key: string; name: string; pane?: boolean; lines: IndicatorLine[] }
 export const INDICATORS: IndicatorDef[] = [
   { key: 'ma', name: '이동평균선', lines: ([[5, '#16a34a'], [20, '#dc2626'], [60, '#f59e0b'], [120, '#8b5cf6']] as const)
@@ -66,8 +72,8 @@ export const INDICATORS: IndicatorDef[] = [
     { label: '0', color: '#f59e0b', calc: b => midRange(b, 9) },   // 전환선
     { label: '1', color: '#16a34a', calc: b => midRange(b, 26) },  // 기준선
     { label: '2', color: '#9ca3af', calc: b => shift(closes(b), -26) }, // 후행스팬
-    { label: '3', color: '#dc2626', calc: b => { const t = midRange(b, 9), k = midRange(b, 26); return shift(t.map((v, i) => v == null || k[i] == null ? null : (v + k[i]!) / 2), 26) } }, // 선행스팬1
-    { label: '4', color: '#2563eb', calc: b => shift(midRange(b, 52), 26) }] }, // 선행스팬2
+    { label: '3', color: '#dc2626', ahead: 26, calc: b => spanA(b) }, // 선행스팬1
+    { label: '4', color: '#2563eb', ahead: 26, calc: b => spanB(b) }] }, // 선행스팬2
   { key: 'volume', name: '거래량', pane: true, lines: [
     { hist: true, options: { priceFormat: { type: 'volume' } }, calc: b => b.map(x => tone(x.volume, x.close >= x.open)) },
     { label: '20', color: '#f59e0b', calc: b => sma(b.map(x => x.volume), 20) }] },
@@ -182,8 +188,7 @@ export function status(bars: Bar[], on: string[]): [string, string, string][] {
     }
   }
   if (on.includes('ichimoku') && bars.length > 52 + 26) {
-    const t = midRange(bars, 9), k = midRange(bars, 26)
-    const a = (t[i - 26]! + k[i - 26]!) / 2, b = midRange(bars, 52)[i - 26]!
+    const a = spanA(bars)[i]!, b = spanB(bars)[i]! // 지금 봉 자리의 구름 (26봉 전에 그려 둔 것)
     const where = last > Math.max(a, b) ? ['구름 위', '상승 추세로 본다. 구름이 아래에서 받쳐 주는 자리']
       : last < Math.min(a, b) ? ['구름 아래', '하락 추세로 본다. 구름이 위에서 누르는 자리']
       : ['구름 안', '방향을 찾는 중. 구름을 어느 쪽으로 빠져나가는지 본다']

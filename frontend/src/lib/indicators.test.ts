@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bollinger, ema, rsi, sma } from './indicators'
+import { bollinger, ema, rsi, sma, spanA, spanB } from './indicators'
 
 // 기대값은 손으로 계산한 것 (지표 수식을 옮기다 깨지기 쉬워서)
 describe('indicators', () => {
@@ -15,4 +15,12 @@ describe('indicators', () => {
   })
 
   it('rsi: 와일더 평활', () => expect(rsi([1, 2, 3, 2], 2)).toEqual([null, null, 100, 50]))
+
+  it('선행스팬: 26봉 앞으로 밀어 그려서 봉 수 + 26개, i번째 봉의 값이 i + 26 자리에', () => {
+    const bars = Array.from({ length: 60 }, (_, i) => ({ time: i, open: i, high: i + 1, low: i, close: i, volume: 0 }))
+    const a = spanA(bars), b = spanB(bars)
+    expect([a.length, b.length]).toEqual([86, 86])
+    expect(a[25 + 26]).toBe(((26 + 17) / 2 + (26 + 0) / 2) / 2) // 25번째 봉: 전환선 (17~25 고저 중간) 21.5, 기준선 (0~25) 13 → 17.25
+    expect(b[59 + 26]).toBe((60 + 8) / 2) // 52봉(8~59) 고가 60, 저가 8
+  })
 })
