@@ -44,7 +44,7 @@ cd $R/frontend && npx tsx scripts/report-facts.ts > <scratchpad>/facts.json
 - **비중이 큰 종목부터, 길게.** 비중 1% 미만은 why 한 줄로 짧게
 - 레버리지 ETF(MUU·SNXX·AMDL·KORU·SOXL 등)는 기초 종목 차트와 함께 보고, 횡보·하락장에서 녹는 구조와 한 종목 쏠림 위험을 비중 판단에 반영한다
 - 현금 비중(`cashPct`)은 알상무 현금 비중에서 출발해 시장 사실로 가감하고, 왜 다른지 why에 쓴다. 그의 원칙(빠질 때 나눠 사기, 종가 근처 매수)은 할 일 문장에 녹인다
-- `cashPct`는 (주식 평가액 + 현금) 중 현금 비율. 현금 잔고를 모르면 지금 현금 0으로 보고, 목표 금액 = 주식 평가액 × cashPct / (100 − cashPct)
+- `cashPct`는 (주식 평가액 + 현금) 중 현금 비율. 현금 잔고를 모르면 지금 현금 0으로 보고, 보유 종목을 팔아 만들 금액 = 주식 평가액 × cashPct / 100 (새 돈을 넣어 맞출 때만 주식 평가액 × cashPct / (100 − cashPct))
 - `date`·`generatedAt`은 지어내지 말고 `TZ=Asia/Seoul date +%F`, `date -Iseconds`로 넣는다
 - action은 이 중 하나: `유지` · `분할 매수` · `비중 축소` · `분할 매도` · `관망`. 바꾸면 `targetPct`(목표 비중 %)를 같이
 
