@@ -43,6 +43,7 @@ export interface Daily {
   date: string; id: string; title: string; headline: string; show?: string
   stance?: { cash?: string | null; odds?: string | null; action?: string | null }
   chart?: Cited[]; points?: Cited[]; levels?: NoteLevel[]; stocks?: Record<string, Cited[]>
+  guest?: { name: string; firm?: string; headline: string; points: Cited[] } | null // 위폴 버디버디 게스트
 }
 export interface Note {
   name: string; source: string; asOf: string; videos: Record<string, string>; summary: string
@@ -81,7 +82,7 @@ export const getStocks = (): Promise<Stock[]> => fetch('/api/stocks').then(r => 
 export const getQuotes = () => json<Quote[]>('/api/quotes', [])
 export const getIndicators = () => json<Indicator[]>('/api/indicators', [])
 export const getNote = () => json<Note | null>('/views/alsangmu.json', null)
-export const getShuka = () => json<{ name: string; source: string; asOf: string; aliases?: Record<string, string>; daily: Daily[] } | null>('/views/shuka.json', null)
+export const getShow = (show: string) => json<{ name: string; source: string; asOf: string; aliases?: Record<string, string>; daily: Daily[] } | null>(`/views/${show}.json`, null)
 export const getReports = () => json<{ reports: Report[] } | null>('/views/report.json', null)
 export const getOrderbook = (code: string) => json<Orderbook | null>('/api/orderbook' + sym(code), null)
 export const getTrades = (code: string) => json<Trade[] | null>('/api/trades' + sym(code), null)
