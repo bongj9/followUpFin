@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ComponentProps } from 'react'
 import {
   BaselineSeries, CandlestickSeries, createChart, createSeriesMarkers, CrosshairMode, HistogramSeries, LineSeries, LineStyle, PriceScaleMode,
-  type IChartApi, type ISeriesApi, type MouseEventParams, type SeriesType, type Time, type UTCTimestamp,
+  type IChartApi, type IPrimitivePaneRenderer, type ISeriesApi, type ISeriesPrimitive, type MouseEventParams, type SeriesAttachedParameter,
+  type SeriesType, type Time, type UTCTimestamp,
 } from 'lightweight-charts'
 import { getBars, onStream, type Bar, type Quote, type Stock } from '@/api'
 import { ChartGuide, signalDate } from '@/components/ChartGuide'
@@ -32,11 +33,68 @@ interface Plot { ind: IndicatorDef; line: IndicatorLine; series: ISeriesApi<Seri
 interface Compare { code: string; series: ISeriesApi<'Line'>; color: string; bars: Bar[] }
 interface View {
   code: string; interval: string; type: Prefs['type']; chart: IChartApi; main: ISeriesApi<SeriesType>
-  plots: Plot[]; inds: IndicatorDef[]; bars: Bar[]; compares: Compare[]; hover: boolean; times: string[]; signals: Signal[]
+  plots: Plot[]; inds: IndicatorDef[]; bars: Bar[]; compares: Compare[]; hover: boolean; times: string[]; signals: Signal[]; cloud?: Cloud
 }
 
 const point = (time: number, v: number | Toned) => typeof v === 'object' ? { time: ts(time), ...v } : { time: ts(time), value: v }
-const toData = (bars: Bar[], vals: (number | Toned | null)[]) => vals.flatMap((val, i) => val == null ? [] : [point(bars[i].time, val)])
+// 봉 시각 뒤에 미래 자리를 n개까지 붙인다 (26봉 앞에 그리는 선행스팬용). 일봉은 주말을 건너뛴다
+// ponytail: 공휴일은 모른다(일봉이면 하루쯤 어긋날 수 있음). 월·년봉은 최근 최소 간격으로 근사
+function timesFor(bars: Bar[], n: number) {
+  const times = bars.map(b => b.time)
+  const step = Math.min(...times.slice(-6).map((t, i, a) => i ? t - a[i - 1] : Infinity))
+  for (let t = times.at(-1)!; times.length < n && step < Infinity;) {
+    t += step
+    const day = new Date(t * 1000).getUTCDay()
+    if (step !== 86400 || (day !== 0 && day !== 6)) times.push(t)
+  }
+  return times
+}
+const toData = (bars: Bar[], vals: (number | Toned | null)[]) => {
+  const times = timesFor(bars, vals.length)
+  return vals.flatMap((val, i) => val == null || times[i] == null ? [] : [point(times[i], val)])
+}
+
+// 일목 구름: 선행스팬1·2 사이를 칠한다. 1이 위면 빨강(양운), 2가 위면 파랑(음운). 두 선이 엇갈리는 점에서 색을 나눈다
+type Draw = Parameters<IPrimitivePaneRenderer['draw']>[0]
+class Cloud implements ISeriesPrimitive<Time> {
+  private p?: SeriesAttachedParameter<Time>
+  private pts: { time: number; a: number; b: number }[] = []
+  attached(p: SeriesAttachedParameter<Time>) { this.p = p }
+  set(bars: Bar[], a: (number | Toned | null)[], b: (number | Toned | null)[]) {
+    const times = timesFor(bars, a.length)
+    this.pts = a.flatMap((v, i) => typeof v !== 'number' || typeof b[i] !== 'number' || times[i] == null ? [] : [{ time: times[i], a: v, b: b[i] as number }])
+    this.p?.requestUpdate()
+  }
+  paneViews() { return [{ zOrder: () => 'bottom' as const, renderer: () => ({ draw: (t: Draw) => this.draw(t) }) }] }
+  private draw(target: Draw) {
+    const p = this.p
+    if (!p || !p.series.options().visible) return
+    const pts = this.pts.flatMap(({ time, a, b }) => {
+      const x = p.chart.timeScale().timeToCoordinate(ts(time)), ya = p.series.priceToCoordinate(a), yb = p.series.priceToCoordinate(b)
+      return x == null || ya == null || yb == null ? [] : [{ x: x as number, ya: ya as number, yb: yb as number }]
+    })
+    if (pts.length < 2) return
+    target.useMediaCoordinateSpace(({ context: ctx }) => {
+      const fill = (run: typeof pts, up: boolean) => {
+        ctx.fillStyle = up ? 'rgba(220,38,38,0.13)' : 'rgba(37,99,235,0.13)'
+        ctx.beginPath()
+        run.forEach(q => ctx.lineTo(q.x, q.ya))
+        run.toReversed().forEach(q => ctx.lineTo(q.x, q.yb))
+        ctx.fill()
+      }
+      let run = [pts[0]], up = pts[0].yb >= pts[0].ya // 화면 y는 아래로 커진다: 1(ya)이 위면 양운
+      for (let i = 1; i < pts.length; i++) {
+        const q = pts[i]
+        if (q.yb >= q.ya === up) { run.push(q); continue }
+        const s = pts[i - 1], d0 = s.yb - s.ya, f = d0 / (d0 - (q.yb - q.ya))
+        const y = s.ya + f * (q.ya - s.ya), cross = { x: s.x + f * (q.x - s.x), ya: y, yb: y }
+        fill([...run, cross], up)
+        run = [cross, q]; up = !up
+      }
+      fill(run, up)
+    })
+  }
+}
 const mainData = (type: Prefs['type'], b: Bar) => type === 'candle' ? { ...b, time: ts(b.time) } : { time: ts(b.time), value: b.close }
 
 // 체결 한 건을 봉 배열에 반영하고 바뀐 봉을 돌려준다 (늦게 온 체결이면 null)
@@ -198,6 +256,11 @@ export function StockChart({ code, stocks }: { code: string; stocks: Stock[] }) 
       v.bars = bars
       main.setData(bars.map(b => mainData(type, b)) as never)
       plots.forEach(p => p.series.setData(toData(bars, p.line.calc(bars)) as never))
+      const [spanA, spanB] = plots.filter(p => p.line.ahead)
+      if (spanA && spanB) {
+        spanA.series.attachPrimitive(v.cloud = new Cloud())
+        v.cloud.set(bars, spanA.line.calc(bars), spanB.line.calc(bars))
+      }
       // ponytail: 표시는 차트를 열 때만 다시 찾는다 (실시간 체결로 새로 생긴 크로스는 다시 열어야 보임). 지금 상태 칸은 체결마다 갱신
       v.signals = findSignals(bars, inds.map(i => i.key))
       // 차트엔 모양만 (글자를 달면 봉과 겹친다). 이름·설명은 범례(마우스 올린 봉)와 보는 법 카드에
@@ -244,7 +307,14 @@ export function StockChart({ code, stocks }: { code: string; stocks: Stock[] }) 
     const bar = applyTrade(v.bars, q, v.interval)
     if (!bar) return
     v.main.update(mainData(v.type, bar) as never)
-    v.plots.forEach(p => { const val = p.line.calc(v.bars).at(-1); if (val != null) p.series.update(point(bar.time, val) as never) })
+    v.plots.forEach(p => {
+      const vals = p.line.calc(v.bars)
+      if (p.line.ahead) { p.series.setData(toData(v.bars, vals) as never); return } // 미래 자리까지 통째로 다시
+      const val = vals.at(-1)
+      if (val != null) p.series.update(point(bar.time, val) as never)
+    })
+    const [spanA, spanB] = v.plots.filter(p => p.line.ahead)
+    if (v.cloud && spanA && spanB) v.cloud.set(v.bars, spanA.line.calc(v.bars), spanB.line.calc(v.bars))
     if (!v.hover) setLegendBar(bar)
     setStatusRows(status(v.bars, v.inds.map(i => i.key)))
   }), [])
