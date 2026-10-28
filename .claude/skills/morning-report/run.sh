@@ -4,9 +4,9 @@
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" # launchd는 .zshrc를 안 읽는다 (claude·node·docker)
 cd "${0:A:h}/../../.." || exit 1
 today=$(TZ=Asia/Seoul date +%F)
-grep -q "\"date\": \"$today\"" ~/.claude/skills/alsangmu-update/web/views/report.json 2>/dev/null && exit 0 # 오늘 것 이미 있음
+curl -sf --max-time 5 localhost:8080/views/report.json | grep -q "\"date\": \"$today\"" && exit 0 # 오늘 것 이미 있음 (launchd는 볼트 파일을 못 읽어서 앱 서버로 읽는다)
 echo "== $(date)"
-view=~/.claude/skills/alsangmu-update/web/views/report.json; before=$(md5 -q $view 2>/dev/null)
+view=~/.claude/skills/alsangmu-update/web/views/report.json; before=$(stat -f %m $view 2>/dev/null)
 # 잠자기 중 잠깐 깬 사이(DarkWake)에 시작되면 다시 잠들어 멈춘다: 도는 동안 깨어 있게 하고, 그래도 멈추면 40분에 끊는다
 caffeinate -i timeout 40m claude -p "아침 리포트를 만들어줘. .claude/skills/morning-report/SKILL.md 순서대로 하고, 마지막에 요약을 출력해" --permission-mode bypassPermissions
 notify-view.sh "아침 리포트" $view "$before" # 다 만들었으면 맥 알림

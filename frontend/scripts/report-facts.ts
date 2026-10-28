@@ -9,7 +9,7 @@ const ALL = ['ma', 'bb', 'ichimoku', 'volume', 'rsi', 'macd']
 const MARKETS = [['KOSPI', '코스피'], ['KOSDAQ', '코스닥'], ['QQQ', '나스닥100 (QQQ)'], ['SPY', 'S&P500 (SPY)'], ['SOXX', '반도체 (SOXX)']]
 
 async function get<T>(path: string, fallback: T): Promise<T> {
-  const res = await fetch(base + path).catch(() => null)
+  const res = await fetch(base + path, { signal: AbortSignal.timeout(15000) }).catch(() => null)
   return res?.ok ? res.json() as Promise<T> : fallback
 }
 const bars = async (code: string, interval: string) =>
