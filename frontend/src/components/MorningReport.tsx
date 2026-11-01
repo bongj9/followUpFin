@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getReports, type Report, type ReportCall } from '@/api'
+import { won, type useAccount } from '@/components/Account'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/format'
 
@@ -14,12 +15,14 @@ const Watch = ({ list }: { list: ReportCall[] }) => !list.length ? null :
 
 // 아침 리포트: 보유 종목·시장을 지표로 판정한 숫자와 알상무 최신 뷰를 합쳐 오늘 할 일을 정리한 것 (아침 리포트 스킬이 매일 씀)
 // 리포트가 없으면(볼트 미연결·아직 안 만듦) 카드를 숨긴다
-export function MorningReport({ tick }: { tick: number }) {
+// 계좌 전체·현금은 왼쪽 내 계좌 카드에 있고, 여기선 종목별 평가액만 붙인다
+export function MorningReport({ tick, account }: { tick: number; account: ReturnType<typeof useAccount> }) {
   const [reports, setReports] = useState<Report[]>([])
   useEffect(() => { getReports().then(r => setReports(r?.reports ?? [])) }, [tick])
   const [today, ...past] = reports
   if (!today) return null
 
+  const value = new Map(account.positions.map(p => [p.symbol, p.value]))
   const ago = Math.floor((Date.now() - +new Date(today.date + 'T00:00:00')) / 864e5)
   // 비중 1% 미만은 접어 둔다 (소액 매수로 산 종목이 많아서)
   const big = today.holdings.filter(h => (h.weightPct ?? 100) >= 1), small = today.holdings.filter(h => (h.weightPct ?? 100) < 1)
@@ -49,6 +52,7 @@ export function MorningReport({ tick }: { tick: number }) {
               <span className="text-muted-foreground text-xs">
                 {h.weightPct != null ? `비중 ${h.weightPct}%` : ''}{h.targetPct != null ? ` → ${h.targetPct}%` : ''}
               </span>
+              {value.get(h.code) != null && <span className="text-muted-foreground text-xs tnum">{won(value.get(h.code)!)}</span>}
               <span className={cn('text-xs font-bold px-2 py-0.5 rounded-md', tone(h.action))}>{h.action}</span>
             </div>
             <div>

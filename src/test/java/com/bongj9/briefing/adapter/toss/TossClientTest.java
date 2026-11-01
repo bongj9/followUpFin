@@ -49,4 +49,35 @@ class TossClientTest {
         assertThat(flows.get(1).individual()).isEqualTo(2165872L);
         assertThat(flows.get(1).foreignerHoldingRate()).isNull();
     }
+
+    @Test
+    void 보유_종목과_계좌_합계는_토스가_계산한_값을_그대로_쓰고_수익률은_퍼센트로_바꾼다() {
+        // 2026-10-31 실제 응답 모양 (금액은 지어낸 값)
+        String json = """
+                {"result": {"totalPurchaseAmount": {"krw": "70000", "usd": "15154.44"},
+                  "marketValue": {"amount": {"krw": "60000", "usd": "5779.2"}, "amountAfterCost": {"krw": "0", "usd": "0"}},
+                  "profitLoss": {"amount": {"krw": "-10000", "usd": "-9375.24"}, "rate": "-0.748"},
+                  "dailyProfitLoss": {"amount": {"krw": "0", "usd": "-696"}, "rate": "-0.0448"},
+                  "items": [
+                  {"symbol": "MUU", "name": "MUU", "marketCountry": "US", "currency": "USD", "quantity": "240",
+                   "lastPrice": "24.08", "averagePurchasePrice": "63.1435",
+                   "marketValue": {"purchaseAmount": "15154.44", "amount": "5779.2", "amountAfterCost": "5758.28"},
+                   "profitLoss": {"amount": "-9375.24", "amountAfterCost": "-9396.16", "rate": "-0.6186", "rateAfterCost": "-0.62"},
+                   "dailyProfitLoss": {"amount": "-696", "rate": "-0.0459"}, "cost": {"commission": "20.92", "tax": null}},
+                  {"symbol": "005930", "name": "삼성전자", "currency": "KRW", "quantity": "1", "averagePurchasePrice": "70000",
+                   "lastPrice": null, "marketValue": null, "profitLoss": null, "dailyProfitLoss": null}
+                ]}}""";
+        var portfolio = JsonMapper.builder().build().readValue(json, TossClient.HoldingsResponse.class).result().toPortfolio();
+
+        assertThat(portfolio.marketValue().get("USD")).isEqualByComparingTo("5779.2");
+        assertThat(portfolio.profitLoss().get("KRW")).isEqualByComparingTo("-10000");
+        assertThat(portfolio.profitRate()).isEqualByComparingTo("-74.8");
+        assertThat(portfolio.dailyProfitRate()).isEqualByComparingTo("-4.48");
+        var muu = portfolio.items().get(0);
+        assertThat(muu.marketValue()).isEqualByComparingTo("5779.2");
+        assertThat(muu.profitLoss()).isEqualByComparingTo("-9375.24");
+        assertThat(muu.profitRate()).isEqualByComparingTo("-61.86");
+        assertThat(muu.dailyProfitRate()).isEqualByComparingTo("-4.59");
+        assertThat(portfolio.items().get(1).profitRate()).isNull();
+    }
 }

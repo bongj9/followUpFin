@@ -6,12 +6,14 @@ import com.bongj9.briefing.domain.InvestorFlow;
 import com.bongj9.briefing.domain.MarketFlow;
 import com.bongj9.briefing.domain.LastPrice;
 import com.bongj9.briefing.domain.Orderbook;
+import com.bongj9.briefing.domain.Portfolio;
 import com.bongj9.briefing.domain.Trade;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 // 시세 출처 (지금은 토스증권). 증권사를 바꾸면 이 인터페이스의 구현만 새로 만든다
 public interface MarketData {
@@ -42,6 +44,13 @@ public interface MarketData {
     // 원/달러 매매기준율. at이 null이면 지금
     BigDecimal usdKrw(Instant at);
 
-    // 내 종합매매 계좌의 보유 주식 (국내·미국)
-    List<Holding> holdings();
+    // 내 종합매매 계좌의 보유 주식 (국내·미국)과 증권사가 계산한 합계
+    Portfolio portfolio();
+
+    default List<Holding> holdings() {
+        return portfolio().items();
+    }
+
+    // 같은 계좌의 현금 매수 가능 금액. 통화(KRW, USD) → 금액
+    Map<String, BigDecimal> cash();
 }

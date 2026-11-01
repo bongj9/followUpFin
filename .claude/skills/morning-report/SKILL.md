@@ -9,8 +9,8 @@ description: "아침 리포트" — 보유 종목과 시장(코스피·코스닥
 
 - 저장소 `R`: 이 스킬이 있는 followUpFin 루트
 - 사실 스크립트: `$R/frontend/scripts/report-facts.ts` (화면과 같은 지표 판정 함수 사용)
-- 알상무 노트: `~/.claude/skills/alsangmu-update/web/views/alsangmu.json`
-- 결과: `~/.claude/skills/alsangmu-update/web/views/report.json` (앱이 `/views/report.json`으로 읽음, 볼트라 동기화·백업됨)
+- 알상무 노트: `~/.claude/skills/alsangmu-update/../web/views/alsangmu.json`
+- 결과: `~/.claude/skills/alsangmu-update/../web/views/report.json` (앱이 `/views/report.json`으로 읽음, 볼트라 동기화·백업됨)
 
 ## 1. 서버 확인
 
@@ -26,13 +26,13 @@ DOWN이면 띄운다: `docker info` 실패 시 `open -a Docker` 후 될 때까�
 cd $R/frontend && npx tsx scripts/report-facts.ts > <scratchpad>/facts.json
 ```
 
-`holdings`가 비었으면(토스 키 없음·실패) 시장 부분만 쓴다. 들어 있는 것: 시장별 `daily`/`weekly`(`status` 지금 상태, `recent` 최근 5봉 신호, 일봉엔 52주 고저), 코스피·코스닥 `rules`(알상무 규칙 순서의 수급·이평선·크로스·볼린저 사실), 보유 종목별 수량·평단·현재가·손익률·원화 평가액·비중(`weightPct`).
+`holdings`가 비었으면(토스 키 없음·실패) 시장 부분만 쓴다. 들어 있는 것: 시장별 `daily`/`weekly`(`status` 지금 상태, `recent` 최근 5봉 신호, 일봉엔 52주 고저), 코스피·코스닥 `rules`(알상무 규칙 순서의 수급·이평선·크로스·볼린저 사실), 보유 종목별 수량·평단·현재가·손익률·원화 평가액·비중(`weightPct`, 주식 안에서의 비중), 현금(`cash` 통화별, `cashKrw`, `cashPct`).
 
 ## 3. 알상무 최신 뷰와 지난 리포트 읽기
 
 - `alsangmu.json`의 `daily[0]`(날짜·방송·headline·stance 현금·levels·stocks), `rules`(비중 규칙), `stocks[코드]`(레버리지 ETF는 `aliases`로 기초 종목을 찾는다)
-- 슈카 노트 `~/.claude/skills/alsangmu-update/web/views/shuka.json`(없으면 건너뜀)의 `daily[0]`과 보유 종목·코스피에 대한 `daily[].stocks` 언급. 국장 분위기를 보는 두 번째 시각으로 쓰고, 알상무와 엇갈리면 그렇다고 쓴다
-- 위폴 노트 `~/.claude/skills/alsangmu-update/web/views/wepoll.json`(없으면 건너뜀)의 `daily[0]`(진행자의 간밤 미국장 뷰와 `guest` 게스트 이름·주장)과 보유 종목 언급. 미국·반도체를 보는 세 번째 시각으로 쓴다. 방송이 07:00~08:30이라 아침 실행 땐 전날 편일 수 있으니 날짜를 적는다
+- 슈카 노트 `~/.claude/skills/alsangmu-update/../web/views/shuka.json`(없으면 건너뜀)의 `daily[0]`과 보유 종목·코스피에 대한 `daily[].stocks` 언급. 국장 분위기를 보는 두 번째 시각으로 쓰고, 알상무와 엇갈리면 그렇다고 쓴다
+- 위폴 노트 `~/.claude/skills/alsangmu-update/../web/views/wepoll.json`(없으면 건너뜀)의 `daily[0]`(진행자의 간밤 미국장 뷰와 `guest` 게스트 이름·주장)과 보유 종목 언급. 미국·반도체를 보는 세 번째 시각으로 쓴다. 방송이 07:00~08:30이라 아침 실행 땐 전날 편일 수 있으니 날짜를 적는다
 - 기존 `report.json`이 있으면 최근 리포트들의 `watch` 조건과 `action`을 오늘 종가와 비교해 채점할 거리를 찾는다
 
 ## 4. 판단 쓰기
@@ -44,7 +44,7 @@ cd $R/frontend && npx tsx scripts/report-facts.ts > <scratchpad>/facts.json
 - **비중이 큰 종목부터, 길게.** 비중 1% 미만은 why 한 줄로 짧게
 - 레버리지 ETF(MUU·SNXX·AMDL·KORU·SOXL 등)는 기초 종목 차트와 함께 보고, 횡보·하락장에서 녹는 구조와 한 종목 쏠림 위험을 비중 판단에 반영한다
 - 현금 비중(`cashPct`)은 알상무 현금 비중에서 출발해 시장 사실로 가감하고, 왜 다른지 why에 쓴다. 그의 원칙(빠질 때 나눠 사기, 종가 근처 매수)은 할 일 문장에 녹인다
-- `cashPct`는 (주식 평가액 + 현금) 중 현금 비율. 현금 잔고를 모르면 지금 현금 0으로 보고, 보유 종목을 팔아 만들 금액 = 주식 평가액 × cashPct / 100 (새 돈을 넣어 맞출 때만 주식 평가액 × cashPct / (100 − cashPct))
+- `cashPct`는 (주식 평가액 + 현금) 중 현금 비율. 지금 현금은 facts.json의 `cashKrw`·`cashPct`(토스 현금 매수 가능 금액, 원화+달러 환산)에서 읽는다. `cash`가 null(조회 실패)이면 지금 현금 0으로 보고, 보유 종목을 팔아 만들 금액 = 주식 평가액 × cashPct / 100 (새 돈을 넣어 맞출 때만 주식 평가액 × cashPct / (100 − cashPct))
 - `date`·`generatedAt`은 지어내지 말고 `TZ=Asia/Seoul date +%F`, `date -Iseconds`로 넣는다
 - action은 이 중 하나: `유지` · `분할 매수` · `비중 축소` · `분할 매도` · `관망`. 바꾸면 `targetPct`(목표 비중 %)를 같이
 
@@ -69,7 +69,7 @@ cd $R/frontend && npx tsx scripts/report-facts.ts > <scratchpad>/facts.json
 ```bash
 python3 - <scratchpad>/report.json <<'EOF'
 import json, os, sys
-out = os.path.expanduser('~/.claude/skills/alsangmu-update/web/views/report.json')
+out = os.path.expanduser('~/.claude/skills/alsangmu-update/../web/views/report.json')
 new = json.load(open(sys.argv[1]))
 for k in ('date', 'headline', 'market', 'holdings'): assert k in new, k
 old = json.load(open(out))['reports'] if os.path.exists(out) else []

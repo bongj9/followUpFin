@@ -3,6 +3,7 @@ package com.bongj9.briefing.adapter.toss;
 import com.bongj9.briefing.application.port.MarketData;
 import com.bongj9.briefing.domain.Candle;
 import com.bongj9.briefing.domain.Holding;
+import com.bongj9.briefing.domain.Portfolio;
 import com.bongj9.briefing.domain.InvestorFlow;
 import com.bongj9.briefing.domain.MarketFlow;
 import com.bongj9.briefing.domain.LastPrice;
@@ -23,7 +24,9 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -44,6 +47,7 @@ public class TossClient implements MarketData {
 
     private String accessToken;
     private Instant expiresAt = Instant.EPOCH;
+    private Long accountSeq;
 
     public TossClient(@Value("${toss.client-id:}") String clientId,
                       @Value("${toss.client-secret:}") String clientSecret) {
@@ -205,28 +209,53 @@ public class TossClient implements MarketData {
 
     // 계좌는 종합매매(BROKERAGE) 하나만 나온다. 보유 주식 API는 계좌 번호가 아니라 accountSeq를 헤더로 받는다
     @Override
-    public List<Holding> holdings() {
-        List<TossAccount> accounts = call(token -> restClient.get()
-                .uri("/api/v1/accounts")
-                .header("Authorization", "Bearer " + token)
-                .retrieve()
-                .body(AccountsResponse.class)
-                .result());
-        if (accounts.isEmpty()) {
-            return List.of();
+    public Portfolio portfolio() {
+        Long accountSeq = accountSeq();
+        if (accountSeq == null) {
+            return Portfolio.EMPTY;
         }
-        long accountSeq = accounts.getFirst().accountSeq();
         return call(token -> restClient.get()
                 .uri("/api/v1/holdings")
                 .header("Authorization", "Bearer " + token)
                 .header("X-Tossinvest-Account", String.valueOf(accountSeq))
                 .retrieve()
                 .body(HoldingsResponse.class)
-                .result()
-                .items()).stream()
-                .map(h -> new Holding(h.symbol(), h.name(), new BigDecimal(h.quantity()),
-                        new BigDecimal(h.averagePurchasePrice()), h.currency()))
-                .toList();
+                .result()).toPortfolio();
+    }
+
+    // 현금으로 살 수 있는 금액(미수 제외). 통화마다 따로 불러야 한다
+    @Override
+    public Map<String, BigDecimal> cash() {
+        Long accountSeq = accountSeq();
+        if (accountSeq == null) {
+            return Map.of();
+        }
+        Map<String, BigDecimal> cash = new LinkedHashMap<>();
+        for (String currency : List.of("KRW", "USD")) {
+            BuyingPower bp = call(token -> restClient.get()
+                    .uri(u -> u.path("/api/v1/buying-power").queryParam("currency", currency).build())
+                    .header("Authorization", "Bearer " + token)
+                    .header("X-Tossinvest-Account", String.valueOf(accountSeq))
+                    .retrieve()
+                    .body(BuyingPowerResponse.class)
+                    .result());
+            cash.put(currency, new BigDecimal(bp.cashBuyingPower()));
+        }
+        return cash;
+    }
+
+    // 계좌 목록 API는 초당 1회라 보유 종목·현금을 같이 부르면 429가 난다. accountSeq는 안 바뀌니 한 번만 받는다
+    private synchronized Long accountSeq() {
+        if (accountSeq == null) {
+            List<TossAccount> accounts = call(token -> restClient.get()
+                    .uri("/api/v1/accounts")
+                    .header("Authorization", "Bearer " + token)
+                    .retrieve()
+                    .body(AccountsResponse.class)
+                    .result());
+            accountSeq = accounts.isEmpty() ? null : accounts.getFirst().accountSeq();
+        }
+        return accountSeq;
     }
 
     // 다른 곳(curl 테스트 등)에서 토큰을 새로 받으면 기존 토큰이 무효가 되므로 401이면 한 번 재발급 후 재시도
@@ -280,13 +309,66 @@ public class TossClient implements MarketData {
     record TossAccount(long accountSeq) { // 계좌번호(accountNo)는 쓰지 않아 받지 않는다
     }
 
+    record BuyingPowerResponse(BuyingPower result) {
+    }
+
+    record BuyingPower(String currency, String cashBuyingPower) {
+    }
+
     record HoldingsResponse(TossHoldings result) {
     }
 
-    record TossHoldings(List<TossPosition> items) {
+    // 합계 금액은 {"krw": "0", "usd": "25991.76"} 모양
+    record TossHoldings(List<TossPosition> items, Map<String, String> totalPurchaseAmount, TossTotalValue marketValue,
+                        TossTotalProfit profitLoss, TossTotalProfit dailyProfitLoss) {
+        Portfolio toPortfolio() {
+            return new Portfolio(items.stream().map(TossPosition::toHolding).toList(), byCurrency(totalPurchaseAmount),
+                    marketValue == null ? Map.of() : byCurrency(marketValue.amount()),
+                    profitLoss == null ? Map.of() : byCurrency(profitLoss.amount()),
+                    profitLoss == null ? null : TossPosition.pct(profitLoss.rate()),
+                    dailyProfitLoss == null ? Map.of() : byCurrency(dailyProfitLoss.amount()),
+                    dailyProfitLoss == null ? null : TossPosition.pct(dailyProfitLoss.rate()));
+        }
+
+        private static Map<String, BigDecimal> byCurrency(Map<String, String> amounts) {
+            Map<String, BigDecimal> out = new LinkedHashMap<>();
+            if (amounts != null) {
+                amounts.forEach((currency, v) -> { if (v != null) out.put(currency.toUpperCase(), new BigDecimal(v)); });
+            }
+            return out;
+        }
     }
 
-    record TossPosition(String symbol, String name, String quantity, String averagePurchasePrice, String currency) {
+    record TossTotalValue(Map<String, String> amount) {
+    }
+
+    record TossTotalProfit(Map<String, String> amount, String rate) {
+    }
+
+    record TossPosition(String symbol, String name, String quantity, String averagePurchasePrice, String currency,
+                        String lastPrice, TossValue marketValue, TossProfit profitLoss, TossProfit dailyProfitLoss) {
+        Holding toHolding() {
+            return new Holding(symbol, name, new BigDecimal(quantity), new BigDecimal(averagePurchasePrice), currency,
+                    num(lastPrice), marketValue == null ? null : num(marketValue.purchaseAmount()),
+                    marketValue == null ? null : num(marketValue.amount()),
+                    profitLoss == null ? null : num(profitLoss.amount()), profitLoss == null ? null : pct(profitLoss.rate()),
+                    dailyProfitLoss == null ? null : num(dailyProfitLoss.amount()),
+                    dailyProfitLoss == null ? null : pct(dailyProfitLoss.rate()));
+        }
+
+        private static BigDecimal num(String v) {
+            return v == null ? null : new BigDecimal(v);
+        }
+
+        static BigDecimal pct(String rate) { // 토스는 비율(-0.6186)로 준다
+            return rate == null ? null : new BigDecimal(rate).movePointRight(2);
+        }
+    }
+
+    record TossValue(String purchaseAmount, String amount) {
+    }
+
+    record TossProfit(String amount, String rate) {
     }
 
     record CandlesResponse(TossCandlePage result) {

@@ -3,6 +3,7 @@ package com.bongj9.briefing.adapter.web;
 import com.bongj9.briefing.application.StockService;
 import com.bongj9.briefing.domain.FollowedStock;
 import com.bongj9.briefing.domain.Holding;
+import com.bongj9.briefing.domain.Portfolio;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,7 +13,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 class StockController {
@@ -47,6 +50,18 @@ class StockController {
     @GetMapping("/api/holdings")
     List<Holding> holdings() {
         return stocks.holdings();
+    }
+
+    // 토스 계좌 보유 종목 + 토스가 계산한 합계(평가금액·손익·수익률). 내 계좌 카드가 쓴다
+    @GetMapping("/api/portfolio")
+    Portfolio portfolio() {
+        return stocks.portfolio();
+    }
+
+    // 토스 계좌 현금 (조회만. 주문 기능은 없다)
+    @GetMapping("/api/cash")
+    Map<String, BigDecimal> cash() {
+        return stocks.cash();
     }
 
     @DeleteMapping("/api/stocks/{stockCode}")

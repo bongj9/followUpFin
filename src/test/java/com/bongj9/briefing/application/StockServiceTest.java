@@ -61,6 +61,6 @@ class StockServiceTest {
     }
 
     private static Holding holding(String symbol, String name, String currency) {
-        return new Holding(symbol, name, BigDecimal.ONE, BigDecimal.TEN, currency);
+        return new Holding(symbol, name, BigDecimal.ONE, BigDecimal.TEN, currency, null, null, null, null, null, null, null);
     }
 }
