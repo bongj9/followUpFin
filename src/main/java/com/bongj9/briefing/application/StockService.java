@@ -7,13 +7,16 @@ import com.bongj9.briefing.domain.FollowedStock;
 import com.bongj9.briefing.domain.FollowedStockRepository;
 import com.bongj9.briefing.domain.FollowedStocksChanged;
 import com.bongj9.briefing.domain.Holding;
+import com.bongj9.briefing.domain.Portfolio;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -58,6 +61,14 @@ public class StockService {
 
     public List<Holding> holdings() {
         return market.holdings();
+    }
+
+    public Portfolio portfolio() {
+        return market.portfolio();
+    }
+
+    public Map<String, BigDecimal> cash() {
+        return market.cash();
     }
 
     public record ImportResult(List<String> added, List<String> failed) {

@@ -83,6 +83,22 @@ export const getQuotes = () => json<Quote[]>('/api/quotes', [])
 export const getIndicators = () => json<Indicator[]>('/api/indicators', [])
 export const getNote = () => json<Note | null>('/views/alsangmu.json', null)
 export const getShow = (show: string) => json<{ name: string; source: string; asOf: string; aliases?: Record<string, string>; daily: Daily[] } | null>(`/views/${show}.json`, null)
+// 토스 계좌 보유 종목. 가격은 거래 통화 기준
+export interface Holding {
+  symbol: string; name: string; quantity: number; averagePrice: number; currency: string
+  // 토스가 계산한 값 (없으면 null). 수익률은 %
+  lastPrice: number | null; purchaseAmount: number | null; marketValue: number | null
+  profitLoss: number | null; profitRate: number | null; dailyProfitLoss: number | null; dailyProfitRate: number | null
+}
+export const getHoldings = () => json<Holding[]>('/api/holdings', [])
+type ByCurrency = { KRW?: number; USD?: number }
+// 보유 종목 + 토스가 계산한 계좌 합계. 수익률은 %
+export interface Portfolio {
+  items: Holding[]; purchaseAmount: ByCurrency; marketValue: ByCurrency
+  profitLoss: ByCurrency; profitRate: number | null; dailyProfitLoss: ByCurrency; dailyProfitRate: number | null
+}
+export const getPortfolio = () => json<Portfolio | null>('/api/portfolio', null)
+export const getCash = () => json<{ KRW?: number; USD?: number } | null>('/api/cash', null) // 토스 현금 매수 가능 금액 (조회만)
 export const getReports = () => json<{ reports: Report[] } | null>('/views/report.json', null)
 export const getOrderbook = (code: string) => json<Orderbook | null>('/api/orderbook' + sym(code), null)
 export const getTrades = (code: string) => json<Trade[] | null>('/api/trades' + sym(code), null)

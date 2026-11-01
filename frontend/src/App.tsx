@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getQuotes, getStocks, onStream, stream, type Quote, type Stock } from '@/api'
+import { Account, useAccount } from '@/components/Account'
 import { AlsangmuView } from '@/components/AlsangmuView'
 import { Feed } from '@/components/Feed'
 import { FlowChart } from '@/components/FlowChart'
@@ -78,6 +79,7 @@ export default function App() {
     return () => { off(); cancelAnimationFrame(frame) }
   }, [])
 
+  const account = useAccount(tick, quotes)
   const code = selected?.stockCode
   return (
     <>
@@ -91,9 +93,13 @@ export default function App() {
         {code
           ? <StockPage key={code} code={code} stocks={stocks} quotes={quotes} tick={tick} select={select} />
           : <>
-              <Watchlist className="[grid-area:watch]" stocks={stocks} quotes={quotes} selected={selected} select={select} refresh={refresh} />
+              {/* 토스처럼 왼쪽 위에 내 계좌, 그 아래 관심 종목 */}
+              <div className="[grid-area:watch] flex flex-col gap-5">
+                <Account account={account} select={select} />
+                <Watchlist className="self-stretch" stocks={stocks} quotes={quotes} selected={selected} select={select} refresh={refresh} />
+              </div>
               <ViewsBoard tick={tick} />
-              <MorningReport tick={tick} />
+              <MorningReport tick={tick} account={account} />
               <FlowChart className="[grid-area:flow]" tick={tick} />
               <AlsangmuView code={null} stocks={stocks} tick={tick} />
               <Feed className="[grid-area:feed]" selected={selected} tick={tick} select={select} />

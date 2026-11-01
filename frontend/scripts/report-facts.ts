@@ -1,7 +1,7 @@
 // 아침 리포트 재료: 보유 종목과 시장 지수를 일봉·주봉 지표로 판정한 사실만 뽑는다. 판단(매수·매도·비중)은 리포트를 쓰는 쪽이 한다
 // 화면과 같은 판정 함수(src/lib/indicators)를 써서 차트에서 보는 것과 숫자가 같다
 // 실행: npx tsx scripts/report-facts.ts [http://localhost:8080] > facts.json
-import type { Bar, Indicator, MarketFlow, Quote } from '../src/api'
+import type { Bar, Holding, Indicator, MarketFlow, Quote } from '../src/api'
 import { marketState, signals, status } from '../src/lib/indicators'
 
 const base = process.argv[2] ?? 'http://localhost:8080'
@@ -29,8 +29,9 @@ function chart(b: Bar[], daily: boolean) {
   }
 }
 
-const [holdings, quotes, indicators] = await Promise.all([
-  get<{ symbol: string; name: string; quantity: number; averagePrice: number; currency: string }[]>('/api/holdings', []),
+const [holdings, cash, quotes, indicators] = await Promise.all([
+  get<Holding[]>('/api/holdings', []),
+  get<{ KRW?: number; USD?: number } | null>('/api/cash', null), // 조회 실패면 null (0원과 구분)
   get<Quote[]>('/api/quotes', []),
   get<Indicator[]>('/api/indicators', []),
 ])
@@ -50,7 +51,7 @@ for (const [code, name] of MARKETS) {
 const rows = []
 for (const h of holdings) {
   const q = quote.get(h.symbol)
-  const last = q?.lastPrice ?? null
+  const last = q?.lastPrice ?? h.lastPrice ?? null // 화면 내 계좌 카드와 같게 실시간 체결가(시간외 포함) 우선
   const krw = last == null ? null : h.quantity * last * (h.currency === 'USD' ? fx ?? NaN : 1)
   const d = await bars(h.symbol, '1d'), w = await bars(h.symbol, '1w')
   rows.push({
@@ -63,4 +64,8 @@ const total = rows.reduce((s, r) => s + (r.valueKrw ?? 0), 0)
 const holdingsOut = rows.map(r => ({ ...r, weightPct: total && r.valueKrw != null ? +(r.valueKrw / total * 100).toFixed(1) : null }))
   .sort((a, b) => (b.weightPct ?? 0) - (a.weightPct ?? 0))
 
-console.log(JSON.stringify({ asOf: new Date().toISOString(), fx, totalKrw: total, market, holdings: holdingsOut }, null, 2))
+// weightPct는 주식 안에서의 비중, cashPct는 (주식 + 현금) 중 현금
+const cashKrw = cash && fx != null ? Math.round((cash.KRW ?? 0) + (cash.USD ?? 0) * fx) : null
+const cashPct = cashKrw != null && total + cashKrw ? +(cashKrw / (total + cashKrw) * 100).toFixed(1) : null
+
+console.log(JSON.stringify({ asOf: new Date().toISOString(), fx, totalKrw: total, cash, cashKrw, cashPct, market, holdings: holdingsOut }, null, 2))
