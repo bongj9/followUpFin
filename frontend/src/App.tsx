@@ -88,7 +88,7 @@ export default function App() {
     return () => { off(); cancelAnimationFrame(frame) }
   }, [])
 
-  const account = useAccount(tick, quotes)
+  const account = useAccount(tick)
   const { eps, aliases } = useShows(tick)
   const tab = page === 'stock' ? 'watch' : page === 'industry' ? 'feed' : page
   const code = selected?.stockCode
