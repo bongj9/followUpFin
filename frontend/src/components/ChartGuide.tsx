@@ -48,7 +48,7 @@ export function ChartGuide({ guideKey, on, signals, intraday, focus, onFocus, on
         <button className="text-muted-foreground cursor-pointer" title="닫기" onClick={onClose}><X size={18} /></button>
       </div>
       <p className="mt-1 mb-2.5 text-muted-foreground">{g.what}</p>
-      {!on && <div className="mt-2.5 px-2.5 py-2 rounded-lg bg-[#eff6ff] text-[#1e40af]">이 지표는 꺼져 있어요. 켜면 차트에 신호가 표시돼요.</div>}
+      {!on && <div className="mt-2.5 px-2.5 py-2 rounded-lg bg-primary-soft text-primary">이 지표는 꺼져 있어요. 켜면 차트에 신호가 표시돼요.</div>}
       <div className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-3">
         <div><h4 className={h4}>이렇게 읽어요</h4><ul className="list-disc pl-[18px]">{g.read.map(t => <li key={t}>{t}</li>)}</ul></div>
         <div><h4 className={h4}>차트 위 표시</h4>{kinds.length
@@ -61,7 +61,7 @@ export function ChartGuide({ guideKey, on, signals, intraday, focus, onFocus, on
         <div className="mt-1 flex flex-wrap gap-1.5">
           {mine.slice(-12).reverse().map(s => (
             <button key={s.time + s.text} onClick={() => onFocus(s)}
-              className={'border bg-card rounded-full px-2.5 py-[3px] text-xs cursor-pointer ' + (focus === s ? 'border-[#111827] font-bold' : 'border-border')}>
+              className={'border bg-card rounded-full px-2.5 py-[3px] text-xs cursor-pointer ' + (focus === s ? 'border-foreground font-bold' : 'border-border')}>
               <Icon s={s} />{' ' + s.text + ' · ' + date(s.time)}
             </button>))}
         </div>

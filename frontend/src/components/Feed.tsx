@@ -119,7 +119,7 @@ function FeedItem({ item, select }: { item: Item; select: (s: Selected) => void 
         : <div className={cn('my-1', move && 'font-bold')}>{i.title}</div>}
       {i.originalTitle && <p className="mt-0.5 mb-1 text-xs text-muted-foreground">원문: {i.originalTitle}</p>}
       <p className="text-[13px] text-muted-foreground">{i.summary}</p>
-      {i.tip && <p className="mt-2 px-3 py-2 bg-[#fefce8] rounded-[10px] text-[#713f12] text-[13px]">볼 것: {i.tip}</p>}
+      {i.tip && <p className="mt-2 px-3 py-2 bg-warn-soft rounded-[10px] text-warn text-[13px]">볼 것: {i.tip}</p>}
     </div>
   )
 }

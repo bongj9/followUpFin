@@ -3,7 +3,7 @@ import { createChart, createSeriesMarkers, HistogramSeries, LineSeries, LineStyl
 import { getFlows, type MarketFlow } from '@/api'
 import { Card, CardTitle } from '@/components/ui/card'
 import { Tabs } from '@/components/ui/tabs'
-import { DOWN, UP } from '@/lib/format'
+import { CHART, DOWN, INK, UP } from '@/lib/format'
 import { sma } from '@/lib/indicators'
 
 const FLOW_MARKETS = [['KOSPI', '코스피'], ['KOSDAQ', '코스닥']] as const
@@ -26,10 +26,9 @@ export function FlowChart({ tick, className }: { tick: number; className?: strin
   useEffect(() => {
     if (!ok || !box.current) return
     const chart = createChart(box.current, {
-      autoSize: true, layout: { fontSize: 11, panes: { separatorColor: '#e5e7eb' } },
-      grid: { vertLines: { color: '#f1f3f5' }, horzLines: { color: '#f1f3f5' } },
+      autoSize: true, ...CHART,
       localization: { priceFormatter: (v: number) => v.toFixed(1) + '조' } })
-    const line = chart.addSeries(LineSeries, { color: '#111827', lineWidth: 2, priceLineVisible: false, title: '누적' })
+    const line = chart.addSeries(LineSeries, { color: INK, lineWidth: 2, priceLineVisible: false, title: '누적' })
     line.setData(flows.map((f, i) => ({ time: f.date, value: jo(cum[i]) })))
     chart.addSeries(LineSeries, { color: DOWN, lineWidth: 1, lineStyle: LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false, title: '4주 평균' })
       .setData(flows.flatMap((f, i) => avg[i] == null ? [] : [{ time: f.date, value: jo(avg[i]!) }]))

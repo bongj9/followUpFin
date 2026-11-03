@@ -2,7 +2,7 @@ import type { ComponentProps } from 'react'
 import { cn } from '@/lib/format'
 
 export function Card({ className, ...props }: ComponentProps<'section'>) {
-  return <section className={cn('bg-card text-card-foreground rounded-card shadow-card p-5', className)} {...props} />
+  return <section className={cn('glass text-card-foreground rounded-card p-5', className)} {...props} />
 }
 
 export function CardTitle({ className, ...props }: ComponentProps<'h2'>) {

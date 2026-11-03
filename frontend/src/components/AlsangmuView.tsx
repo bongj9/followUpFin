@@ -6,7 +6,7 @@ import { marketState, type MarketState } from '@/lib/indicators'
 
 const sec = (t: string) => t.split(':').reduce((a, v) => a * 60 + +v, 0)
 export const yt = (id: string, t?: string) => `https://www.youtube.com/watch?v=${id}` + (t ? `&t=${sec(t)}s` : '')
-const tag = 'text-xs font-semibold px-2.5 py-0.5 rounded-full bg-white text-primary'
+const tag = 'text-xs font-semibold px-2.5 py-0.5 rounded-full bg-primary text-primary-foreground'
 
 // 투자 관점 노트(views/*.json, git 제외: 실존 인물 영상 요약이라 공개 저장소에 안 올린다)를 지금 코스피에 대입한다
 // 노트가 없으면 섹션을 숨긴다. 그가 지금 이렇게 말한 게 아니라 그의 규칙을 지금 데이터에 맞춰 보여주는 것
@@ -43,7 +43,7 @@ export function AlsangmuView({ code, stocks, tick }: { code: string | null; stoc
           <span>{said?.summary ?? '영상에서 이 종목을 따로 다룬 적은 없어요. 차트 규칙만 대입'}</span>
           <span className="ml-auto text-link whitespace-nowrap">자세히 ↓</span>
         </div>
-      : null /* 홈의 오늘 방송 요약은 ViewsBoard */}
+      : null /* 홈의 오늘 방송 요약은 Shows.tsx ShowCard */}
     <View ref={viewRef} note={note} m={m} code={code} name={name} />
   </>
 }

@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/format'
 
 // 매수 쪽은 빨강, 줄이는 쪽은 파랑 (한국식 상승·하락 색)
-const ACTION_TONE: [RegExp, string][] = [[/매수|늘/, 'bg-up text-white'], [/매도|축소|줄/, 'bg-down text-white']]
+const ACTION_TONE: [RegExp, string][] = [[/매수|늘/, 'bg-up text-[#2a0d08]'], [/매도|축소|줄/, 'bg-down text-[#0b1530]']]
 const tone = (action: string) => ACTION_TONE.find(([re]) => re.test(action))?.[1] ?? 'bg-muted text-foreground'
 const label = (date: string) => new Date(date + 'T00:00:00').toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })
 const h3 = 'text-[15px] font-bold mt-[18px] mb-1.5'
@@ -27,7 +27,7 @@ export function MorningReport({ tick, account }: { tick: number; account: Return
   // 비중 1% 미만은 접어 둔다 (소액 매수로 산 종목이 많아서)
   const big = today.holdings.filter(h => (h.weightPct ?? 100) >= 1), small = today.holdings.filter(h => (h.weightPct ?? 100) < 1)
   return (
-    <Card className="[grid-area:report] prose-list text-[13px] leading-[1.6] bg-[linear-gradient(180deg,#fff1f2,var(--color-card)_160px)]">
+    <Card className="[grid-area:report] prose-list text-[13px] leading-[1.6] bg-[linear-gradient(135deg,rgba(212,242,106,0.10),var(--color-card)_45%)]">
       <div className="inline-block text-xs font-bold text-up bg-card px-2.5 py-[3px] rounded-full">
         {`아침 리포트 · ${label(today.date)}`}
         {ago > 0 && <span className="text-warn font-normal ml-1.5">{`(${ago}일 전, 오늘 것 아직 없음)`}</span>}
@@ -80,6 +80,50 @@ export function MorningReport({ tick, account }: { tick: number; account: Return
           <ul>{r.holdings.map(h => <li key={h.code}><b>{h.name}</b>{` ${h.action} · ${h.why[0] ?? ''}`}</li>)}</ul>
         </details>)}
       </details>}
+    </Card>
+  )
+}
+
+// 개요 맨 위 요약 카드: 헤드라인, 종목별 할 일, 현금 비중(지금 → 목표), 지난 판단 채점 3개. 전체는 아침 리포트 탭
+const mark = (result: string) => /^맞았/.test(result) ? ['text-primary', '맞음'] : /미실행/.test(result) ? ['text-up', '미실행']
+  : /틀렸/.test(result) ? ['text-up', '틀림'] : ['text-muted-foreground', '보류']
+export function ReportHero({ tick, account }: { tick: number; account: ReturnType<typeof useAccount> }) {
+  const [today, setToday] = useState<Report | null>(null)
+  useEffect(() => { getReports().then(r => setToday(r?.reports[0] ?? null)) }, [tick])
+  if (!today) return null
+  const total = account.stocks + (account.cashKrw ?? 0)
+  const cashNow = account.cashKrw != null && total ? Math.round(account.cashKrw / total * 100) : null
+  const target = today.market.cashPct
+  const ago = Math.floor((Date.now() - +new Date(today.date + 'T00:00:00')) / 864e5)
+  return (
+    <Card className="grid grid-cols-[1.5fr_1fr] max-[900px]:grid-cols-1 gap-6 p-6 bg-[linear-gradient(135deg,rgba(212,242,106,0.10),var(--color-card)_45%)]">
+      <div>
+        <div className="text-[11px] font-semibold text-primary">
+          {`아침 리포트 · ${label(today.date)} · 판단 「${today.market.stance}」`}
+          {ago > 0 && <span className="text-warn font-normal ml-1.5">{`(${ago}일 전, 오늘 것 아직 없음)`}</span>}
+        </div>
+        <div className="text-[17px] font-semibold leading-[1.45] tracking-[-0.01em] mt-1.5 mb-3.5">{today.headline}</div>
+        <div className="flex gap-2 flex-wrap">{today.holdings.filter(h => (h.weightPct ?? 100) >= 1).map(h =>
+          <a key={h.code} href={'#/stock/' + encodeURIComponent(h.code)} className="px-3 py-2 rounded-2xl bg-white/[0.06] border border-border hover:bg-white/10">
+            <b className={cn('text-xs', /매수|늘/.test(h.action) ? 'text-primary' : /매도|축소|줄/.test(h.action) ? 'text-up' : 'text-muted-foreground')}>{h.action}</b>
+            <b className="text-xs ml-1">{h.code}</b>
+            <small className="block text-[11px] text-muted-foreground">{h.weightPct != null ? `${h.weightPct}%` : ''}{h.targetPct != null ? ` → ${h.targetPct}%` : ''}</small>
+          </a>)}</div>
+      </div>
+      <div className="rounded-[18px] p-4 bg-black/20 border border-border flex flex-col gap-2.5">
+        <div className="flex justify-between text-xs"><span className="text-muted-foreground">현금 비중</span>{target != null && <span className="text-muted-foreground/70">{`목표 ${target}%`}</span>}</div>
+        <div className="text-[28px] font-semibold tracking-[-0.02em] tnum">{cashNow == null ? '-' : cashNow + '%'}
+          {target != null && <span className="text-sm text-muted-foreground/70">{` → ${target}%`}</span>}</div>
+        <div className="h-2 rounded-full bg-white/10 relative">
+          <i className="absolute inset-y-0 left-0 rounded-full bg-primary" style={{ width: (cashNow ?? 0) + '%' }} />
+          {target != null && <em className="absolute -top-1 w-0.5 h-4 bg-white rounded" style={{ left: target + '%' }} />}
+        </div>
+        {!!today.review?.length && <ul className="mt-1.5">{today.review.slice(0, 3).map((r, k) => {
+          const [c, t] = mark(r.result)
+          return <li key={k} className="text-xs text-muted-foreground py-1.5 border-t border-white/[0.06] first:border-t-0"><b className={c}>{t}</b>{` · ${r.date.slice(5)} ${r.call}`}</li>
+        })}</ul>}
+        <a href="#/report" className="text-[11px] text-muted-foreground hover:text-foreground">리포트 전체 보기 →</a>
+      </div>
     </Card>
   )
 }
