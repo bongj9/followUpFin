@@ -12,7 +12,7 @@ const LABEL: Record<FeedType, string> = { NEWS: '뉴스', DISCLOSURE: '공시', 
 const TABS = [['NEWS', '뉴스'], ['DISCLOSURE', '공시'], ['MOVE', '급등락'], ['MARKET', '시장']] as const
 const empty = 'text-muted-foreground p-6 text-center'
 
-export function Feed({ selected, tick, select, className }: { selected: Selected; tick: number; select: (s: Selected) => void; className?: string }) {
+export function Feed({ selected, tick, select, className, followed = true }: { selected: Selected; tick: number; select: (s: Selected) => void; className?: string; followed?: boolean }) {
   const [feedType, setFeedType] = useState<FeedType>('NEWS')
   const [nonce, setNonce] = useState(0) // 탭을 다시 누르면 새로 받는다
   const [moves, setMoves] = useState(0) // 큰 변동(SSE move)이 오면 다시 받는다
@@ -39,7 +39,7 @@ export function Feed({ selected, tick, select, className }: { selected: Selected
       {disclosures ? <Disclosures code={code} nonce={nonce} select={select} />
         : items && (items.length
           ? items.map((i, k) => <FeedItem key={(i.url ?? i.title) + k} item={i} select={select} />)
-          : <div className={empty}>이 탭에 해당하는 항목이 없어요.</div>)}
+          : <div className={empty}>{followed || feedType === 'MARKET' ? '이 탭에 해당하는 항목이 없어요.' : '관심 종목에 추가하면 뉴스를 모으기 시작해요.'}</div>)}
     </Card>
   )
 }

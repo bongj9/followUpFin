@@ -90,7 +90,7 @@ const mark = (result: string) => /^맞았/.test(result) ? ['text-primary', '맞�
 export function ReportHero({ tick, account }: { tick: number; account: ReturnType<typeof useAccount> }) {
   const [today, setToday] = useState<Report | null>(null)
   useEffect(() => { getReports().then(r => setToday(r?.reports[0] ?? null)) }, [tick])
-  if (!today) return null
+  if (!today?.market) return null
   const total = account.stocks + (account.cashKrw ?? 0)
   const cashNow = account.cashKrw != null && total ? Math.round(account.cashKrw / total * 100) : null
   const target = today.market.cashPct
@@ -111,9 +111,9 @@ export function ReportHero({ tick, account }: { tick: number; account: ReturnTyp
           </a>)}</div>
       </div>
       <div className="rounded-[18px] p-4 bg-black/20 border border-border flex flex-col gap-2.5">
-        <div className="flex justify-between text-xs"><span className="text-muted-foreground">현금 비중</span>{target != null && <span className="text-muted-foreground/70">{`목표 ${target}%`}</span>}</div>
+        <div className="flex justify-between text-xs"><span className="text-muted-foreground">현금 비중</span>{target != null && <span className="text-muted-foreground">{`목표 ${target}%`}</span>}</div>
         <div className="text-[28px] font-semibold tracking-[-0.02em] tnum">{cashNow == null ? '-' : cashNow + '%'}
-          {target != null && <span className="text-sm text-muted-foreground/70">{` → ${target}%`}</span>}</div>
+          {target != null && <span className="text-sm text-muted-foreground">{` → ${target}%`}</span>}</div>
         <div className="h-2 rounded-full bg-white/10 relative">
           <i className="absolute inset-y-0 left-0 rounded-full bg-primary" style={{ width: (cashNow ?? 0) + '%' }} />
           {target != null && <em className="absolute -top-1 w-0.5 h-4 bg-white rounded" style={{ left: target + '%' }} />}

@@ -29,7 +29,7 @@ function Stance({ ep, full }: { ep: Episode; full?: boolean }) {
       <p className={cn(!full && 'line-clamp-2')}><b className="text-foreground mr-1.5">{k}</b>{v}</p></div>)}</div>
 }
 
-const topStocks = (ep: Episode, n: number) => Object.entries(ep.stocks ?? {}).sort((a, b) => b[1].length - a[1].length).slice(0, n).map(([c]) => c)
+const topStocks = (ep: Episode, n: number) => Object.entries(ep.stocks ?? {}).sort((a, b) => (b[1]?.length ?? 0) - (a[1]?.length ?? 0)).slice(0, n).map(([c]) => c)
 
 function Who({ ep, extra }: { ep: Episode; extra?: string }) {
   return <div className="flex gap-2.5 items-center min-w-0"><Avatar src={ep.src} />
@@ -45,7 +45,7 @@ export function ShowCard({ src, eps, stocks, open }: { src: Src; eps: Episode[];
   const same = mine.filter(e => e.date === ep.date).length
   const ago = Math.floor((Date.now() - +new Date(ep.date + 'T00:00:00')) / 864e5)
   return (
-    <Card className="flex flex-col gap-3 cursor-pointer transition hover:-translate-y-0.5 hover:bg-white/[0.075]" onClick={() => open(ep)}>
+    <Card className="flex flex-col gap-3 cursor-pointer transition hover:-translate-y-0.5 hover:bg-white/[0.075]" onClick={() => open(ep)} role="button" tabIndex={0} onKeyDown={ev => ev.key === 'Enter' && open(ep)}>
       <Who ep={ep} extra={same > 1 ? `같은 날 ${same}편` : undefined} />
       {ago > 1 && <div className="text-[11px] text-warn">{`${ago}일 전 방송 · 새 방송 아직 없음`}</div>}
       <div className="text-[13px] leading-[1.5] line-clamp-3">{ep.headline}</div>
@@ -77,17 +77,17 @@ export function EpisodeDrawer({ ep, stocks, close }: { ep: Episode | null; stock
   return <>
     <div className={cn('fixed inset-0 z-30 bg-black/35 transition-opacity', ep ? 'opacity-100' : 'opacity-0 pointer-events-none')} onClick={close} />
     <aside className={cn('glass fixed z-40 top-3 right-3 bottom-3 w-[min(520px,92vw)] rounded-[26px] p-[22px] overflow-y-auto bg-[rgba(28,24,20,0.78)] transition-transform duration-300',
-      ep ? 'translate-x-0' : 'translate-x-[110%]')} aria-hidden={!ep}>
+      ep ? 'translate-x-0' : 'translate-x-[110%]')} aria-hidden={!ep} role="dialog" aria-modal="true">
       {ep && <>
         <div className="flex justify-between items-center gap-3"><Who ep={ep} />
-          <button className="glass grid place-items-center w-8 h-8 rounded-full cursor-pointer" onClick={close} title="닫기"><X size={15} /></button></div>
+          <button className="glass grid place-items-center w-8 h-8 rounded-full cursor-pointer" onClick={close} title="닫기" autoFocus><X size={15} /></button></div>
         <a className="block text-[11px] text-muted-foreground mt-2.5" href={yt(ep.id)} target="_blank" rel="noopener">{ep.title + ' ↗'}</a>
         <div className="text-[15px] font-semibold leading-[1.5] mt-3 mb-3">{ep.headline}</div>
         <Stance ep={ep} full />
         {ep.guest && <>
           <h3 className="text-xs text-muted-foreground font-semibold mt-5 mb-1">{`게스트 · ${ep.guest.name}${ep.guest.firm ? ' · ' + ep.guest.firm : ''}`}</h3>
           <p className="text-[13px] font-semibold">{ep.guest.headline}</p>
-          <ul>{ep.guest.points.map((r, k) => <li key={k} className="text-[13px] py-[7px] border-t border-white/[0.06] first:border-t-0">{r.text}<CiteLink id={ep.id} cite={r.cite} /></li>)}</ul>
+          <ul>{(ep.guest.points ?? []).map((r, k) => <li key={k} className="text-[13px] py-[7px] border-t border-white/[0.06] first:border-t-0">{r.text}<CiteLink id={ep.id} cite={r.cite} /></li>)}</ul>
         </>}
         {list('차트·시황', ep.chart)}{list('핵심 포인트', ep.points)}
         {!!ep.levels?.length && <>
@@ -98,7 +98,7 @@ export function EpisodeDrawer({ ep, stocks, close }: { ep: Episode | null; stock
           <h3 className="text-xs text-muted-foreground font-semibold mt-5 mb-1.5">다룬 종목 · 누르면 종목별 발언</h3>
           <div className="flex flex-wrap gap-1.5">{Object.keys(ep.stocks!).map(c =>
             <button key={c} className={cn(chip, 'cursor-pointer hover:bg-white/15')} onClick={() => { close(); go(c) }}>{nameOf(c, stocks)}</button>)}</div></>}
-        <p className="text-[11px] text-muted-foreground/70 mt-7">{`${WHO[ep.src].who} 방송에서 한 말을 요약한 것이에요. 자동 자막 기반이라 숫자·이름이 틀릴 수 있어요`}</p>
+        <p className="text-[11px] text-muted-foreground mt-7">{`${WHO[ep.src].who} 방송에서 한 말을 요약한 것이에요. 자동 자막 기반이라 숫자·이름이 틀릴 수 있어요`}</p>
       </>}
     </aside>
   </>
@@ -117,7 +117,7 @@ export function ShowsPage({ eps, stocks, open }: { eps: Episode[]; stocks: Stock
     {days.map(d => <div key={d} className="grid grid-cols-[110px_1fr] max-[720px]:grid-cols-1 gap-4">
       <div className="text-xs text-muted-foreground pt-3.5">{dateLabel(d)}</div>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-2.5">{list.filter(e => e.date === d).map(e =>
-        <Card key={e.src + e.id} className="p-3.5 flex flex-col gap-2 cursor-pointer hover:bg-white/[0.08]" onClick={() => open(e)}>
+        <Card key={e.src + e.id} className="p-3.5 flex flex-col gap-2 cursor-pointer hover:bg-white/[0.08]" onClick={() => open(e)} role="button" tabIndex={0} onKeyDown={ev => ev.key === 'Enter' && open(e)}>
           <Who ep={e} extra={e.guest ? '게스트 ' + e.guest.name : undefined} />
           <div className="text-[13px] leading-[1.5] line-clamp-3">{e.headline}</div>
           <div className="flex flex-wrap gap-1.5">{topStocks(e, 5).map(c => <span key={c} className={chip}>{nameOf(c, stocks)}</span>)}</div>

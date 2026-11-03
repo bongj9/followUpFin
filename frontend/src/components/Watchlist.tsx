@@ -12,7 +12,8 @@ import { isRecent, saidFor, whoMentioned, type Episode } from '@/lib/shows'
 
 const NO_INDUSTRY = '분류 없음'
 // 업종은 Finnhub 영어 이름으로 온다. 화면에만 한글로 (필터·업종 피드는 원래 이름)
-const KO: Record<string, string> = { Semiconductors: '반도체', Technology: '기술', Automobiles: '자동차', Banking: '은행', Pharmaceuticals: '제약', Retail: '유통', Media: '미디어' }
+const KO: Record<string, string> = { Semiconductors: '반도체', Technology: '기술', Automobiles: '자동차', Banking: '은행', Pharmaceuticals: '제약', Biotechnology: '바이오', Retail: '유통', Media: '미디어',
+  Software: '소프트웨어', Energy: '에너지', 'Financial Services': '금융', 'Aerospace & Defense': '항공·방산', Communications: '통신', Machinery: '기계' }
 const ko = (i: string) => KO[i] ?? i
 const PALETTE = ['#dfe8ff', '#f4dfd6', '#e8f0d0', '#efe3c6', '#e5dcf5', '#d8efe9']
 const pill = 'glass rounded-full px-3 py-[7px] text-xs cursor-pointer'
@@ -33,13 +34,15 @@ export function Watchlist({ stocks, quotes, positions, eps, aliases, select, ref
   const [showAdd, setShowAdd] = useState(false)
 
   const held = new Map(positions.filter(p => p.quantity >= 1).map(p => [p.symbol, p]))
-  const totalValue = positions.reduce((s, p) => s + (p.value ?? 0), 0)
+  // 계좌 카드와 같은 분모: 값과 매입가가 다 있는 종목만
+  const totalValue = positions.filter(p => p.value != null && p.purchase != null).reduce((s, p) => s + (p.value ?? 0), 0)
   const weight = (code: string) => totalValue ? (held.get(code)?.value ?? 0) / totalValue : 0
   const industries = [...new Set(stocks.map(s => s.industry ?? NO_INDUSTRY))].sort()
+  if (industry && !industries.includes(industry)) setIndustry(null) // 그 업종 마지막 종목을 뺐을 때
   const key = {
     rate: (s: Stock) => Math.abs(quotes[s.stockCode]?.changeRate ?? 0),
     weight: (s: Stock) => weight(s.stockCode),
-    talk: (s: Stock) => saidFor(eps, aliases, s.stockCode).filter(r => isRecent(eps, r.ep.date)).length,
+    talk: (s: Stock) => saidFor(eps, aliases, s.stockCode).filter(r => isRecent(r.ep.date)).length,
   }[sort]
   const q = query.trim().toLowerCase()
   const list = stocks
@@ -82,7 +85,7 @@ export function Watchlist({ stocks, quotes, positions, eps, aliases, select, ref
     <div className="flex gap-2 items-center flex-wrap">
       <label className="glass rounded-full w-[260px] px-3.5 py-[9px] flex gap-2 items-center text-muted-foreground">
         <Search size={14} className="shrink-0" />
-        <input className="bg-transparent outline-none text-xs text-foreground w-full placeholder:text-muted-foreground/70" placeholder="종목명, 티커, 업종 검색…"
+        <input className="bg-transparent outline-none text-xs text-foreground w-full placeholder:text-muted-foreground" placeholder="종목명, 티커, 업종 검색…"
           value={query} onChange={e => setQuery(e.target.value)} />
       </label>
       {[null, ...industries].map(i => <button key={i ?? 'all'} onClick={() => setIndustry(i)}
@@ -112,7 +115,8 @@ export function Watchlist({ stocks, quotes, positions, eps, aliases, select, ref
         const rate = h ? h.profitRate : quote?.changeRate
         return (
           <Card key={s.stockCode} className="p-4 flex flex-col gap-3 cursor-pointer transition hover:-translate-y-0.5 hover:bg-white/[0.075]"
-            onClick={() => select({ stockCode: s.stockCode })}>
+            onClick={() => select({ stockCode: s.stockCode })} role="link" tabIndex={0}
+            onKeyDown={ev => ev.key === 'Enter' && ev.target === ev.currentTarget && select({ stockCode: s.stockCode })}>
             <div className="flex justify-between items-center">
               <div className="grid place-items-center w-[38px] h-[38px] rounded-full font-bold text-[11px] text-[#1c1c1c]" style={{ background: PALETTE[n % PALETTE.length] }}>{ini}</div>
               <div className="flex gap-2 items-center">
@@ -126,8 +130,8 @@ export function Watchlist({ stocks, quotes, positions, eps, aliases, select, ref
               <div className="text-[11px] text-muted-foreground truncate">{[ko(s.industry ?? NO_INDUSTRY), s.stockCode, h && `${h.quantity.toLocaleString('en-US')}주 보유`].filter(Boolean).join(' · ')}</div>
             </div>
             <div className="grid grid-cols-2 gap-2 px-3 py-2.5 rounded-[14px] bg-white/[0.045] border border-white/[0.06] tnum">
-              <div><small className="block text-[10px] text-muted-foreground/70">현재가</small><b className="text-[13px] font-semibold">{quote ? priceText(quote) : '-'}</b></div>
-              <div><small className="block text-[10px] text-muted-foreground/70">{h ? '보유 손익' : '오늘'}</small>
+              <div><small className="block text-[10px] text-muted-foreground">현재가</small><b className="text-[13px] font-semibold">{quote ? priceText(quote) : '-'}</b></div>
+              <div><small className="block text-[10px] text-muted-foreground">{h ? '보유 손익' : '오늘'}</small>
                 <b className={cn('text-[13px] font-semibold', dirClass(rate), quote?.bigMove && !h && 'px-1.5 rounded-md bg-warn-soft')}>{rate == null ? '-' : signedPct(rate)}</b></div>
             </div>
             <div className="flex items-center gap-2.5 text-[10px] text-muted-foreground">

@@ -125,6 +125,7 @@ export default function App() {
                   </div>
                 </Section>
                 <Section title="여럿이 같이 언급한 종목" sub="최근 7일 · 누르면 종목별 발언"><Consensus eps={eps} stocks={stocks} /></Section>
+                <Section title="알상무 코스피 판정" sub="알상무 차트 규칙으로 본 오늘 코스피"><AlsangmuView code={null} stocks={stocks} tick={tick} /></Section>
               </>}
               {page === 'watch' && <Watchlist stocks={stocks} quotes={quotes} positions={account.positions} eps={eps} aliases={aliases} select={select} refresh={refresh} />}
               {page === 'shows' && <ShowsPage eps={eps} stocks={stocks} open={setEp} />}
@@ -142,7 +143,7 @@ export default function App() {
 }
 
 const Section = ({ title, sub, children }: { title: string; sub: string; children: ReactNode }) =>
-  <section><h2 className="text-[15px] font-semibold tracking-[-0.01em] mb-3">{title}<small className="text-[11px] font-normal text-muted-foreground/70 ml-2">{sub}</small></h2>{children}</section>
+  <section><h2 className="text-[15px] font-semibold tracking-[-0.01em] mb-3">{title}<small className="text-[11px] font-normal text-muted-foreground ml-2">{sub}</small></h2>{children}</section>
 
 const TITLES: Record<string, string> = { '': '오늘의 브리핑', watch: '관심 종목 보드', shows: '영상 요약', report: '아침 리포트', feed: '뉴스·공시', account: '내 계좌' }
 
@@ -178,7 +179,7 @@ function StockPage({ code, stocks, quotes, tick, select, eps, aliases, open }: {
       <Mentions className="[grid-area:said]" code={code} eps={eps} aliases={aliases} open={open} />
       {/* 차트를 내려 봐도 뉴스는 옆에 남는다 */}
       <Feed className="[grid-area:feed] min-[1101px]:sticky min-[1101px]:top-4 min-[1101px]:max-h-[calc(100vh-32px)] min-[1101px]:overflow-y-auto"
-        selected={{ stockCode: code }} tick={tick} select={select} />
+        selected={{ stockCode: code }} tick={tick} select={select} followed={stocks.some(s => s.stockCode === code)} />
       <div className="[grid-area:below] grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-4 items-start">
         <Investors list={side.investors} />
         <Card><CardTitle>호가</CardTitle><OrderBook side={side} quote={quote} /></Card>
