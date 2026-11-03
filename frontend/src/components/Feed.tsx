@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { MarketRead } from '@/components/MarketRead'
 import { errorText, getFeed, onStream, type DisclosureList, type FeedItem as Item, type FeedType } from '@/api'
 import type { Selected } from '@/App'
 import { Badge } from '@/components/ui/badge'
@@ -36,6 +37,7 @@ export function Feed({ selected, tick, select, className, followed = true }: { s
     <Card className={className}>
       <CardTitle className="mt-0">{title}</CardTitle>
       <Tabs items={TABS} value={feedType} onChange={t => { setFeedType(t); setItems(null); setNonce(n => n + 1) }} />
+      {feedType === 'MARKET' && <MarketRead tick={tick} />}
       {disclosures ? <Disclosures code={code} nonce={nonce} select={select} />
         : items && (items.length
           ? items.map((i, k) => <FeedItem key={(i.url ?? i.title) + k} item={i} select={select} />)
