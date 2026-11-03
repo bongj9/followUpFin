@@ -8,5 +8,6 @@ curl -sf --max-time 5 localhost:8080/views/report.json | grep -q "\"date\": \"$t
 echo "== $(date)"
 view=~/.claude/skills/alsangmu-update/../web/views/report.json; before=$(stat -f %m $view 2>/dev/null)
 # 잠자기 중 잠깐 깬 사이(DarkWake)에 시작되면 다시 잠들어 멈춘다: 도는 동안 깨어 있게 하고, 그래도 멈추면 40분에 끊는다
+export CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 # claude -p는 백그라운드 작업(요약 에이전트·느린 자막 받기)을 10분 뒤 끊는다. 끝은 아래 timeout 40m이 정한다
 caffeinate -i timeout 40m claude -p "아침 리포트를 만들어줘. .claude/skills/morning-report/SKILL.md 순서대로 하고, 마지막에 요약을 출력해" --permission-mode bypassPermissions
 notify-view.sh "아침 리포트" $view "$before" # 다 만들었으면 맥 알림

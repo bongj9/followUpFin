@@ -12,6 +12,7 @@ import com.bongj9.briefing.domain.Trade;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -19,6 +20,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -39,8 +41,10 @@ public class TossClient implements MarketData {
     private static final int CANDLE_PAGE = 200; // 토스 최대값
     private static final int FLOW_PAGE = 100; // 시장 투자자별 매매대금 최대값
 
+    // 토스가 응답을 안 주면 기본값(무한 대기)으로는 IndicatorService 락을 쥔 채 멈춰 지표 화면이 통째로 안 바뀐다
     private final RestClient restClient = RestClient.builder()
             .baseUrl("https://openapi.tossinvest.com")
+            .requestFactory(timeouts())
             .build();
     private final String clientId;
     private final String clientSecret;
@@ -48,6 +52,13 @@ public class TossClient implements MarketData {
     private String accessToken;
     private Instant expiresAt = Instant.EPOCH;
     private Long accountSeq;
+
+    private static SimpleClientHttpRequestFactory timeouts() {
+        SimpleClientHttpRequestFactory f = new SimpleClientHttpRequestFactory();
+        f.setConnectTimeout(Duration.ofSeconds(5));
+        f.setReadTimeout(Duration.ofSeconds(15));
+        return f;
+    }
 
     public TossClient(@Value("${toss.client-id:}") String clientId,
                       @Value("${toss.client-secret:}") String clientSecret) {
