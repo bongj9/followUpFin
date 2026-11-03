@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getCash, getIndicators, getPortfolio, type Holding, type Portfolio } from '@/api'
-import type { Quotes, Selected } from '@/App'
+import type { Selected } from '@/App'
 import { Card } from '@/components/ui/card'
 import { cn, dirClass, signedPct } from '@/lib/format'
 
@@ -8,11 +8,10 @@ export const won = (n: number) => Math.round(n).toLocaleString('ko-KR') + '원'
 
 export interface Position extends Holding { purchase: number | null; value: number | null; profit: number | null; daily: number | null; profitUsd: number | null }
 
-// 수량·평단·매입금액은 토스 계좌(10초마다 조회), 가격은 실시간 체결(웹소켓 → SSE, 시간외 포함)로 계산한다. 조회만 하고 주문은 하지 않는다
-// 그래서 관심 종목 시세와 숫자가 항상 같고, 장 마감 뒤엔 토스 계좌 API(정규장 가격)와 다를 수 있다. 실시간 가격이 없으면 토스 값을 쓴다
+// 금액은 토스 계좌 API가 계산한 값 그대로 쓴다 (10초마다 조회). 실시간 체결가로 다시 계산하면 토스와 끝자리가 어긋나서 안 한다. 조회만 하고 주문은 하지 않는다
 // 평가금액은 팔 때 낼 수수료·세금을 뺀 값 (토스 "비용 차감" 기준)
 // 달러 종목은 매입금액·평가금액 모두 오늘 원/달러로 환산한다. 살 때 환율이 아니라서 원화 손익에 환차손익은 빠진다 (그래서 달러 손익도 같이 보여준다)
-export function useAccount(tick: number, quotes: Quotes) {
+export function useAccount(tick: number) {
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null)
   const [cash, setCash] = useState<{ KRW?: number; USD?: number } | null>(null)
   const [fx, setFx] = useState<number | null>(null)
@@ -28,15 +27,12 @@ export function useAccount(tick: number, quotes: Quotes) {
 
   const krw = (v: number | null, currency: string) => v == null ? null : currency === 'USD' ? (fx == null ? null : v * fx) : v
   const positions: Position[] = (portfolio?.items ?? []).map(h => {
-    const q = quotes[h.symbol], last = q?.lastPrice ?? h.lastPrice
     const purchase = h.purchaseAmount ?? h.quantity * h.averagePrice
-    const gross = last == null ? h.marketValue : h.quantity * last
-    const value = gross == null ? null : gross - (h.cost ?? 0)
+    const value = h.marketValue == null ? null : h.marketValue - (h.cost ?? 0)
     const profit = value == null ? null : value - purchase
-    const daily = q?.change != null ? h.quantity * q.change : h.dailyProfitLoss // 전일 종가 대비
+    const daily = h.dailyProfitLoss // 전일 종가 대비, 토스 값
     return {
-      ...h, lastPrice: last, profitRate: profit == null || !purchase ? null : profit / purchase * 100,
-      dailyProfitRate: q?.changeRate ?? h.dailyProfitRate,
+      ...h, profitRate: profit == null || !purchase ? null : profit / purchase * 100,
       purchase: krw(purchase, h.currency), value: krw(value, h.currency), profit: krw(profit, h.currency), daily: krw(daily, h.currency),
       profitUsd: h.currency === 'USD' ? profit : null,
     }
