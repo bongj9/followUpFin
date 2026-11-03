@@ -28,6 +28,7 @@ public class IndicatorService {
             new Item("KOSPI", "코스피", true),
             new Item("KOSDAQ", "코스닥", true),
             new Item("QQQ", "나스닥100 (QQQ)", false),
+            new Item("DIA", "다우30 (DIA)", false),
             new Item("IWM", "러셀2000 (IWM)", false),
             new Item("SPY", "S&P500 (SPY)", false));
 
