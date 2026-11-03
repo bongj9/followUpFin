@@ -8,7 +8,7 @@ export function StockHead({ code, stock, quote, select, className }:
   { code: string; stock?: Stock; quote?: Quote; select: (s: Selected) => void; className?: string }) {
   return (
     <div className={cn('flex items-center gap-3 px-1', className)}>
-      <button className="grid place-items-center w-10 h-10 bg-card shadow-card rounded-xl cursor-pointer hover:bg-background" title="전체 뉴스로" onClick={() => select(null)}>
+      <button className="grid place-items-center w-10 h-10 glass rounded-full cursor-pointer hover:bg-white/10" title="관심 종목으로" onClick={() => select(null)}>
         <ArrowLeft size={18} />
       </button>
       <div>

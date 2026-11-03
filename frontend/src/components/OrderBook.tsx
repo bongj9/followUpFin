@@ -17,7 +17,7 @@ export function OrderBook({ side, quote }: { side: Side; quote?: Quote }) {
     const rate = prev ? (+l.price / prev - 1) * 100 : null
     const now = quote && +l.price === +quote.lastPrice
     return (
-      <div key={kind + i} className={cn('lvl grid grid-cols-[1fr_auto_1fr] items-center h-7 text-xs tnum', kind, kind === 'ask' ? 'bg-[#f5f8ff]' : 'bg-[#fff6f6]')}>
+      <div key={kind + i} className={cn('lvl grid grid-cols-[1fr_auto_1fr] items-center h-7 text-xs tnum', kind, kind === 'ask' ? 'bg-down/5' : 'bg-up/5')}>
         {kind === 'ask' ? vol : <span />}
         <span className={cn('flex flex-col items-center min-w-[84px] leading-[1.15] px-1.5 py-px rounded', dirClass(rate), now && 'shadow-[inset_0_0_0_1.5px_var(--color-foreground)]')}>
           <b>{num(l.price, currency)}</b>

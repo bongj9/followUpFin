@@ -80,7 +80,7 @@ export function Account({ account, select, className }: { account: ReturnType<ty
 
       <div className="text-[13px] font-bold mx-1 mt-5 mb-1">{`보유 종목 ${positions.length}`}</div>
       {positions.map(p => (
-        <div key={p.symbol} className="flex justify-between items-center gap-2 px-3 py-2.5 -mx-1 rounded-xl cursor-pointer transition-colors hover:bg-background"
+        <div key={p.symbol} className="flex justify-between items-center gap-2 px-3 py-2.5 -mx-1 rounded-xl cursor-pointer transition-colors hover:bg-white/10"
           onClick={() => select({ stockCode: p.symbol })}
           title={p.lastPrice == null ? undefined : `현재가 ${p.currency === 'USD' ? '$' + p.lastPrice : won(p.lastPrice)} · 평단 ${p.currency === 'USD' ? '$' + p.averagePrice : won(p.averagePrice)}`}>
           <div className="min-w-0">

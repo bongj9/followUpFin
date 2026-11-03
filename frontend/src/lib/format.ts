@@ -21,4 +21,8 @@ export const signedPct = (rate: number) => (rate > 0 ? '+' : '') + rate.toFixed(
 
 // 차트 라이브러리는 UTC로 그리므로 시각은 한국 시간으로 옮겨서 넣는다. 화면에 날짜를 쓸 땐 되돌린다
 export const KST = 9 * 3600
-export const UP = '#dc2626', DOWN = '#2563eb'
+export const UP = '#ff8a7a', DOWN = '#8fb4ff'
+// 차트 라이브러리는 배경·글자색을 직접 받는다 (CSS 변수를 못 읽음)
+export const CHART = { layout: { background: { color: 'transparent' }, textColor: 'rgba(242,241,238,0.6)', fontSize: 11, panes: { separatorColor: 'rgba(255,255,255,0.1)' } },
+  grid: { vertLines: { color: 'rgba(255,255,255,0.05)' }, horzLines: { color: 'rgba(255,255,255,0.05)' } } }
+export const INK = '#f2f1ee'

@@ -6,7 +6,7 @@ import {
 } from 'lightweight-charts'
 import { getBars, onStream, type Bar, type Quote, type Stock } from '@/api'
 import { ChartGuide, signalDate } from '@/components/ChartGuide'
-import { cn, DOWN, fmt, KST, UP } from '@/lib/format'
+import { CHART, cn, DOWN, fmt, INK, KST, UP } from '@/lib/format'
 import { ICON, INDICATORS, signals as findSignals, status, type IndicatorDef, type IndicatorLine, type Signal, type Toned } from '@/lib/indicators'
 
 // 차트 (토스 시세, TradingView 오픈소스 Lightweight Charts). 토스증권 차트처럼 툴바·보조지표·그리기·자·종목비교
@@ -76,7 +76,7 @@ class Cloud implements ISeriesPrimitive<Time> {
     if (pts.length < 2) return
     target.useMediaCoordinateSpace(({ context: ctx }) => {
       const fill = (run: typeof pts, up: boolean) => {
-        ctx.fillStyle = up ? 'rgba(220,38,38,0.13)' : 'rgba(37,99,235,0.13)'
+        ctx.fillStyle = up ? 'rgba(255,138,122,0.14)' : 'rgba(143,180,255,0.14)'
         ctx.beginPath()
         run.forEach(q => ctx.lineTo(q.x, q.ya))
         run.toReversed().forEach(q => ctx.lineTo(q.x, q.yb))
@@ -115,7 +115,7 @@ function applyTrade(bars: Bar[], q: Quote, interval: string): Bar | null {
   return bar
 }
 
-const toolBtn = 'border-0 bg-transparent rounded-md px-[9px] py-[5px] text-[13px] cursor-pointer hover:bg-background'
+const toolBtn = 'border-0 bg-transparent rounded-md px-[9px] py-[5px] text-[13px] cursor-pointer hover:bg-white/10'
 function Btn({ active, className, ...props }: ComponentProps<'button'> & { active?: boolean }) {
   return <button className={cn(toolBtn, active && 'bg-muted font-bold', className)} {...props} />
 }
@@ -189,7 +189,7 @@ export function StockChart({ code, stocks }: { code: string; stocks: Stock[] }) 
     const key = v.code + '|' + v.interval
     if (t === 'draw') {
       drawings.set(key, [...(drawings.get(key) ?? []), [a, b]])
-      addLine(v, [a, b], '#111827', LineStyle.Solid)
+      addLine(v, [a, b], INK, LineStyle.Solid)
       return
     }
     clearMeasure()
@@ -207,8 +207,7 @@ export function StockChart({ code, stocks }: { code: string; stocks: Stock[] }) 
     const tickLabel = (i: Time) => times[(i as number) - 1] ? new Date(times[(i as number) - 1]).toLocaleTimeString('ko-KR') : ''
     const chart = createChart(chartRef.current!, {
       autoSize: true,
-      layout: { fontSize: 11, panes: { separatorColor: '#e5e7eb' } },
-      grid: { vertLines: { color: '#f1f3f5' }, horzLines: { color: '#f1f3f5' } },
+      ...CHART,
       crosshair: { mode: CrosshairMode.Normal },
       timeScale: tick ? { tickMarkFormatter: tickLabel } : { timeVisible: !!BUCKET[interval] },
       localization: tick ? { timeFormatter: tickLabel } : {},
@@ -223,8 +222,8 @@ export function StockChart({ code, stocks }: { code: string; stocks: Stock[] }) 
     }
     if (tick) {
       const main = chart.addSeries(BaselineSeries, {
-        topLineColor: UP, topFillColor1: 'rgba(220,38,38,0.2)', topFillColor2: 'rgba(220,38,38,0.02)',
-        bottomLineColor: DOWN, bottomFillColor1: 'rgba(37,99,235,0.02)', bottomFillColor2: 'rgba(37,99,235,0.2)' })
+        topLineColor: UP, topFillColor1: 'rgba(255,138,122,0.22)', topFillColor2: 'rgba(255,138,122,0.02)',
+        bottomLineColor: DOWN, bottomFillColor1: 'rgba(143,180,255,0.02)', bottomFillColor2: 'rgba(143,180,255,0.22)' })
       // 틱은 저장하지 않는다. 페이지를 연 뒤 들어오는 실시간 체결만 그린다
       const v: View = { code, interval, type, chart, main, times, plots: [], inds: [], bars: [], compares: [], hover: false, signals: [] }
       setView(viewRef.current = v)
@@ -232,7 +231,7 @@ export function StockChart({ code, stocks }: { code: string; stocks: Stock[] }) 
     }
     const main: ISeriesApi<SeriesType> = type === 'candle'
       ? chart.addSeries(CandlestickSeries, { upColor: UP, downColor: DOWN, borderVisible: false, wickUpColor: UP, wickDownColor: DOWN })
-      : chart.addSeries(LineSeries, { color: '#111827', lineWidth: 2 })
+      : chart.addSeries(LineSeries, { color: INK, lineWidth: 2 })
     const hidden = prefsRef.current.hidden
     const plots: Plot[] = inds.flatMap(ind => {
       const paneIndex = ind.pane ? panes.indexOf(ind) + 1 : 0
@@ -278,7 +277,7 @@ export function StockChart({ code, stocks }: { code: string; stocks: Stock[] }) 
       })
       // 종목비교는 토스처럼 % 눈금 (각 선의 화면 첫 값 대비 등락률)
       if (compares.length) main.priceScale().applyOptions({ mode: PriceScaleMode.Percentage })
-      ;(drawings.get(code + '|' + interval) ?? []).forEach(pts => addLine(v, pts, '#111827', LineStyle.Solid))
+      ;(drawings.get(code + '|' + interval) ?? []).forEach(pts => addLine(v, pts, INK, LineStyle.Solid))
       setView(v) // 범례·보는 법이 지표·비교 목록과 신호를 보도록
       setStatusRows(status(bars, v.inds.map(i => i.key)))
       setLegendBar(bars.at(-1) ?? null)
@@ -360,7 +359,7 @@ export function StockChart({ code, stocks }: { code: string; stocks: Stock[] }) 
 
   const intraday = INTRADAY.some(([k]) => k === prefs.interval)
   const others = stocks.filter(s => s.stockCode !== code)
-  const menuBox = 'absolute right-0 top-full z-10 bg-card border border-border rounded-xl px-3 py-2.5 shadow-[0_6px_20px_rgba(0,0,0,0.1)] grid gap-2 text-[13px] min-w-[180px]'
+  const menuBox = 'absolute right-0 top-full z-10 border border-border rounded-xl px-3 py-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.5)] bg-card-solid grid gap-2 text-[13px] min-w-[180px]'
 
   return (
     <div ref={boxRef} className="chart-box">
@@ -384,7 +383,7 @@ export function StockChart({ code, stocks }: { code: string; stocks: Stock[] }) 
         {menu === 'ind' && <div className={menuBox}>
           {INDICATORS.map(ind => <label key={ind.key} className="flex gap-1.5 items-center cursor-pointer">
             <input type="checkbox" checked={prefs.on.includes(ind.key)} onChange={() => toggleIndicator(ind.key)} />{ind.name}
-            <button className="ml-auto px-[7px] py-px text-xs text-muted-foreground bg-background rounded-md cursor-pointer" onClick={e => { e.preventDefault(); openGuide(ind.key) }}>보는 법</button>
+            <button className="ml-auto px-[7px] py-px text-xs text-muted-foreground bg-white/10 rounded-md cursor-pointer" onClick={e => { e.preventDefault(); openGuide(ind.key) }}>보는 법</button>
           </label>)}
         </div>}
         {menu === 'compare' && <div className={menuBox}>
@@ -395,9 +394,9 @@ export function StockChart({ code, stocks }: { code: string; stocks: Stock[] }) 
       </div>
       <div className="chart-wrap relative" style={{ height: MAIN_HEIGHT + panes.length * PANE_HEIGHT }}>
         <Legend view={view} bar={legendBar} hidden={prefs.hidden} onHide={toggleHidden} onRemove={toggleIndicator} onGuide={openGuide} onUncompare={toggleCompare} />
-        {measure && <div className={cn('absolute z-[4] text-xs font-bold bg-white border border-current rounded-md px-1.5 py-0.5 pointer-events-none whitespace-nowrap', measure.up ? 'up' : 'down')}
+        {measure && <div className={cn('absolute z-[4] text-xs font-bold bg-card-solid border border-current rounded-md px-1.5 py-0.5 pointer-events-none whitespace-nowrap', measure.up ? 'up' : 'down')}
           style={{ left: measure.left, top: measure.top }}>{measure.text}</div>}
-        {tip && <div ref={tipRef} className="absolute z-[5] pointer-events-none max-w-[280px] bg-card border border-border border-t-[3px] border-t-current rounded-lg px-2.5 py-2 text-xs leading-[1.5] shadow-[0_6px_20px_rgba(0,0,0,0.12)]"
+        {tip && <div ref={tipRef} className="absolute z-[5] pointer-events-none max-w-[280px] bg-card-solid border border-border border-t-[3px] border-t-current rounded-lg px-2.5 py-2 text-xs leading-[1.5] shadow-[0_6px_20px_rgba(0,0,0,0.12)]"
           style={{ color: tip.marks[0].color }}>
           <div className="text-muted-foreground text-[11px]">{tip.date}</div>
           {tip.marks.map((s, k) => <p key={k} className={cn('mt-0.5 text-foreground', k > 0 && 'border-t border-dashed border-border pt-1 mt-1')}>
@@ -408,7 +407,7 @@ export function StockChart({ code, stocks }: { code: string; stocks: Stock[] }) 
       </div>
       {guideKey && view && <ChartGuide guideKey={guideKey} on={view.inds.some(i => i.key === guideKey)} signals={view.signals}
         intraday={!!BUCKET[view.interval]} focus={guideFocus} onFocus={focusSignal} onClose={() => openGuide(guideKey)} />}
-      {!!statusRows.length && <div className="px-3.5 py-2.5 border-t border-[#f1f3f5] text-[13px] flex flex-col gap-1">
+      {!!statusRows.length && <div className="px-3.5 py-2.5 border-t border-border text-[13px] flex flex-col gap-1">
         {statusRows.map(([name, state, why]) => <div key={name}><b>{name + ' '}</b>{state + ' '}<span className="text-muted-foreground">{'· ' + why}</span></div>)}
       </div>}
     </div>
@@ -425,8 +424,8 @@ function Legend({ view: v, bar, hidden, onHide, onRemove, onGuide, onUncompare }
   const base = prev?.close ?? bar.open
   const dir = (val: number) => val >= base ? 'up' : 'down'
   const rate = prev ? (bar.close / prev.close - 1) * 100 : null
-  const row = 'flex gap-1.5 items-center bg-white/85 px-1 py-px rounded w-fit'
-  const mini = 'pointer-events-auto bg-[#f1f3f5] rounded w-[18px] h-[18px] text-[11px] leading-[18px] cursor-pointer text-muted-foreground p-0'
+  const row = 'flex gap-1.5 items-center bg-black/45 px-1 py-px rounded w-fit'
+  const mini = 'pointer-events-auto bg-white/10 rounded w-[18px] h-[18px] text-[11px] leading-[18px] cursor-pointer text-muted-foreground p-0'
   // 지표는 한 줄에 모아서 차트를 덜 가린다. 이름을 누르면 보는 법
   const chips = INDICATORS.filter(ind => v.plots.some(p => p.ind === ind))
   return (
