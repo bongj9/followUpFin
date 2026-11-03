@@ -89,6 +89,7 @@ export interface Holding {
   // 토스가 계산한 값 (없으면 null). 수익률은 %
   lastPrice: number | null; purchaseAmount: number | null; marketValue: number | null
   profitLoss: number | null; profitRate: number | null; dailyProfitLoss: number | null; dailyProfitRate: number | null
+  cost: number | null // 팔 때 낼 수수료·세금 (거래 통화)
 }
 export const getHoldings = () => json<Holding[]>('/api/holdings', [])
 type ByCurrency = { KRW?: number; USD?: number }

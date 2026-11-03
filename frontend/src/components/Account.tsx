@@ -6,11 +6,12 @@ import { cn, dirClass, signedPct } from '@/lib/format'
 
 export const won = (n: number) => Math.round(n).toLocaleString('ko-KR') + '원'
 
-export interface Position extends Holding { purchase: number | null; value: number | null; profit: number | null; daily: number | null }
+export interface Position extends Holding { purchase: number | null; value: number | null; profit: number | null; daily: number | null; profitUsd: number | null }
 
 // 수량·평단·매입금액은 토스 계좌(10초마다 조회), 가격은 실시간 체결(웹소켓 → SSE, 시간외 포함)로 계산한다. 조회만 하고 주문은 하지 않는다
 // 그래서 관심 종목 시세와 숫자가 항상 같고, 장 마감 뒤엔 토스 계좌 API(정규장 가격)와 다를 수 있다. 실시간 가격이 없으면 토스 값을 쓴다
-// 달러 종목은 원/달러로 원화 환산 (원화 금액은 토스 앱 환율과 조금 다를 수 있음)
+// 평가금액은 팔 때 낼 수수료·세금을 뺀 값 (토스 "비용 차감" 기준)
+// 달러 종목은 매입금액·평가금액 모두 오늘 원/달러로 환산한다. 살 때 환율이 아니라서 원화 손익에 환차손익은 빠진다 (그래서 달러 손익도 같이 보여준다)
 export function useAccount(tick: number, quotes: Quotes) {
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null)
   const [cash, setCash] = useState<{ KRW?: number; USD?: number } | null>(null)
@@ -29,31 +30,35 @@ export function useAccount(tick: number, quotes: Quotes) {
   const positions: Position[] = (portfolio?.items ?? []).map(h => {
     const q = quotes[h.symbol], last = q?.lastPrice ?? h.lastPrice
     const purchase = h.purchaseAmount ?? h.quantity * h.averagePrice
-    const value = last == null ? h.marketValue : h.quantity * last
+    const gross = last == null ? h.marketValue : h.quantity * last
+    const value = gross == null ? null : gross - (h.cost ?? 0)
     const profit = value == null ? null : value - purchase
     const daily = q?.change != null ? h.quantity * q.change : h.dailyProfitLoss // 전일 종가 대비
     return {
       ...h, lastPrice: last, profitRate: profit == null || !purchase ? null : profit / purchase * 100,
       dailyProfitRate: q?.changeRate ?? h.dailyProfitRate,
       purchase: krw(purchase, h.currency), value: krw(value, h.currency), profit: krw(profit, h.currency), daily: krw(daily, h.currency),
+      profitUsd: h.currency === 'USD' ? profit : null,
     }
   }).sort((a, b) => (b.value ?? 0) - (a.value ?? 0))
   const priced = positions.filter(p => p.value != null && p.purchase != null)
   const sum = (f: (p: Position) => number | null) => priced.reduce((s, p) => s + (f(p) ?? 0), 0)
   const stocks = sum(p => p.value), purchase = sum(p => p.purchase), profit = sum(p => p.profit), daily = sum(p => p.daily)
+  const profitUsd = priced.some(p => p.profitUsd != null) ? sum(p => p.profitUsd) : null
   const cashKrw = cash && fx != null ? (cash.KRW ?? 0) + (cash.USD ?? 0) * fx : null
   return {
     positions, cash, stocks, cashKrw, ready: priced.length > 0,
-    profit, profitRate: purchase ? profit / purchase * 100 : null,
+    profit, profitUsd, profitRate: purchase ? profit / purchase * 100 : null,
     daily, dailyRate: stocks - daily ? daily / (stocks - daily) * 100 : null, // 어제 평가액 대비
   }
 }
 
 const signedWon = (n: number) => (n > 0 ? '+' : '') + won(n)
+const usd = (n: number) => (n > 0 ? '+$' : n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString('en-US', { maximumFractionDigits: 2 })
 
 // 토스 "내 계좌"처럼: 총자산 크게, 아래 평가손익, 주식·현금, 보유 종목(평가액·수익률)
 export function Account({ account, select, className }: { account: ReturnType<typeof useAccount>; select: (s: Selected) => void; className?: string }) {
-  const { positions, cash, stocks, profit, profitRate, daily, dailyRate, cashKrw, ready } = account
+  const { positions, cash, stocks, profit, profitUsd, profitRate, daily, dailyRate, cashKrw, ready } = account
   if (!ready) return null
   const pct = (r: number | null) => r == null ? '' : ` (${signedPct(r)})`
   return (
@@ -62,7 +67,7 @@ export function Account({ account, select, className }: { account: ReturnType<ty
       <div className="text-[26px] font-extrabold tracking-[-0.03em] tnum mx-1 mt-1">{won(stocks + (cashKrw ?? 0))}</div>
       <div className="grid grid-cols-[auto_1fr] gap-x-3 text-[13px] tnum mx-1 mt-1">
         <span className="text-muted-foreground">총 손익</span>
-        <span className={cn('font-semibold', dirClass(profit))}>{signedWon(profit) + pct(profitRate)}</span>
+        <span className={cn('font-semibold', dirClass(profit))}>{signedWon(profit) + pct(profitRate)}{profitUsd != null && <span className="font-normal text-muted-foreground" title="달러 손익. 원화 손익은 오늘 환율로 바꾼 값이라 환차손익이 빠져 있다">{` · ${usd(profitUsd)}`}</span>}</span>
         <span className="text-muted-foreground">오늘</span>
         <span className={cn('font-semibold', dirClass(daily))}>{signedWon(daily) + pct(dailyRate)}</span>
       </div>

@@ -357,14 +357,15 @@ public class TossClient implements MarketData {
     }
 
     record TossPosition(String symbol, String name, String quantity, String averagePurchasePrice, String currency,
-                        String lastPrice, TossValue marketValue, TossProfit profitLoss, TossProfit dailyProfitLoss) {
+                        String lastPrice, TossValue marketValue, TossProfit profitLoss, TossProfit dailyProfitLoss, TossCost cost) {
         Holding toHolding() {
             return new Holding(symbol, name, new BigDecimal(quantity), new BigDecimal(averagePurchasePrice), currency,
                     num(lastPrice), marketValue == null ? null : num(marketValue.purchaseAmount()),
                     marketValue == null ? null : num(marketValue.amount()),
                     profitLoss == null ? null : num(profitLoss.amount()), profitLoss == null ? null : pct(profitLoss.rate()),
                     dailyProfitLoss == null ? null : num(dailyProfitLoss.amount()),
-                    dailyProfitLoss == null ? null : pct(dailyProfitLoss.rate()));
+                    dailyProfitLoss == null ? null : pct(dailyProfitLoss.rate()),
+                    cost == null ? null : cost.total());
         }
 
         private static BigDecimal num(String v) {
@@ -377,6 +378,13 @@ public class TossClient implements MarketData {
     }
 
     record TossValue(String purchaseAmount, String amount) {
+    }
+
+    // 팔 때 낼 수수료·세금 {"commission": "20.73", "tax": null}
+    record TossCost(String commission, String tax) {
+        BigDecimal total() {
+            return (commission == null ? BigDecimal.ZERO : new BigDecimal(commission)).add(tax == null ? BigDecimal.ZERO : new BigDecimal(tax));
+        }
     }
 
     record TossProfit(String amount, String rate) {
