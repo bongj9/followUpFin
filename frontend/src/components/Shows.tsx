@@ -4,7 +4,7 @@ import type { Cited, Stock } from '@/api'
 import { yt } from '@/components/AlsangmuView'
 import { Card } from '@/components/ui/card'
 import { cn, fmt } from '@/lib/format'
-import { consensus, dateLabel, nameOf, saidFor, WHO, type Episode, type Src } from '@/lib/shows'
+import { biasBoard, biasByDate, consensus, dateLabel, nameOf, saidFor, WHO, type Episode, type Src } from '@/lib/shows'
 
 // 방송 요약 화면들 (views/*.json, git 제외: 실존 인물 영상을 편마다 요약한 개인 공부 노트). 그들의 말을 옮긴 것이고 판단은 본인 몫
 const go = (code: string) => { location.hash = '#/stock/' + encodeURIComponent(code) }
@@ -56,6 +56,48 @@ export function ShowCard({ src, eps, stocks, open }: { src: Src; eps: Episode[];
   )
 }
 
+const BIAS = { 롱: 'text-up bg-[var(--color-up)]/10', 숏: 'text-down bg-[var(--color-down)]/10', 중립: 'text-muted-foreground bg-white/[0.07]' } as const
+const BiasTag = ({ b, h }: { b: keyof typeof BIAS; h?: string | null }) =>
+  <span className={cn('text-[11px] font-bold px-2 py-[2px] rounded-full whitespace-nowrap', BIAS[b])}>{b}{h && <span className="font-normal opacity-80">{' ' + h}</span>}</span>
+const md = (date: string) => date.slice(5).replace('-', '/')
+
+// 사람별 롱·숏: 진행자 셋 + 게스트·패널, 최근 2주. 칸을 누르면 그 방송
+export function BiasBoard({ eps, open }: { eps: Episode[]; open: (ep: Episode) => void }) {
+  const rows = biasBoard(eps)
+  if (!rows.length) return <p className="text-muted-foreground text-xs">최근 2주 안에 판정된 방송이 없어요.</p>
+  return <Card className="p-0 overflow-hidden"><ul>{rows.map(([who, vs]) =>
+    <li key={who} className="grid grid-cols-[150px_1fr] max-[720px]:grid-cols-1 gap-3 px-4 py-3 border-t border-white/[0.06] first:border-t-0">
+      <div className="flex gap-2.5 items-center min-w-0"><Avatar src={vs[0].src} small />
+        <div className="min-w-0"><b className="text-[13px]">{who}</b>
+          <div className="text-[11px] text-muted-foreground truncate">{vs[0].sub ?? vs[0].ep.show}</div></div></div>
+      <div className="flex flex-col gap-1.5 min-w-0">{vs.slice(0, 4).map((v, k) =>
+        <button key={k} className="flex gap-2 items-baseline text-left text-[12px] cursor-pointer hover:text-foreground text-muted-foreground min-w-0" onClick={() => open(v.ep)}>
+          <span className="tnum w-10 shrink-0">{md(v.ep.date)}</span><BiasTag b={v.bias} h={v.horizon} />
+          <span className="truncate">{v.why}</span></button>)}</div>
+    </li>)}</ul></Card>
+}
+
+// 날짜 × 사람 롱·숏 표 (영상 요약 탭 맨 위). 칸을 누르면 그 방송
+const COLS = [...Object.keys(WHO), 'guest'] as const
+export function BiasTable({ eps, open }: { eps: Episode[]; open: (ep: Episode) => void }) {
+  const rows = biasByDate(eps)
+  if (!rows.length) return null
+  const th = 'text-left text-[11px] text-muted-foreground font-semibold px-3 py-2'
+  return <Card className="p-0 overflow-x-auto">
+    <table className="w-full text-[12px] min-w-[640px]">
+      <thead><tr><th className={th}>날짜</th>{COLS.map(c => <th key={c} className={th}>{c === 'guest' ? '게스트·패널' : WHO[c as Src].who}</th>)}</tr></thead>
+      <tbody>{rows.map(([date, vs]) => <tr key={date} className="border-t border-white/[0.06] align-top">
+        <td className="px-3 py-2 tnum text-muted-foreground whitespace-nowrap">{md(date)}</td>
+        {COLS.map(c => <td key={c} className="px-3 py-2"><div className="flex flex-wrap gap-1.5">
+          {vs.filter(v => c === 'guest' ? v.who !== WHO[v.src].who : v.who === WHO[c as Src].who).map((v, k) =>
+            <button key={k} title={v.why} className="flex gap-1 items-center cursor-pointer hover:opacity-80" onClick={() => open(v.ep)}>
+              {c === 'guest' && <span>{v.who}</span>}<BiasTag b={v.bias} h={c === 'guest' ? null : v.horizon} />
+              {c !== 'guest' && v.ep.show && <span className="text-[10px] text-muted-foreground">{v.ep.show}</span>}</button>)}
+        </div></td>)}
+      </tr>)}</tbody>
+    </table></Card>
+}
+
 export function Consensus({ eps, stocks }: { eps: Episode[]; stocks: Stock[] }) {
   const list = consensus(eps).slice(0, 12)
   if (!list.length) return null
@@ -84,9 +126,16 @@ export function EpisodeDrawer({ ep, stocks, close }: { ep: Episode | null; stock
         <a className="block text-[11px] text-muted-foreground mt-2.5" href={yt(ep.id)} target="_blank" rel="noopener">{ep.title + ' ↗'}</a>
         <div className="text-[15px] font-semibold leading-[1.5] mt-3 mb-3">{ep.headline}</div>
         <Stance ep={ep} full />
+        {ep.bias && <p className="flex gap-2 items-baseline text-[12px] text-muted-foreground mt-3"><BiasTag b={ep.bias.bias} h={ep.bias.horizon} />{ep.bias.why}</p>}
+        {ep.panel?.map((p, i) => <div key={i}>
+          <h3 className="text-xs text-muted-foreground font-semibold mt-5 mb-1">{[p.name, p.role, p.topic && `'${p.topic}'`].filter(Boolean).join(' · ')}</h3>
+          <p className="flex gap-2 items-baseline text-[13px] font-semibold"><BiasTag b={p.bias} h={p.horizon} />{p.view}</p>
+          <ul>{p.reasons.map((r, k) => <li key={k} className="text-[13px] py-[7px] border-t border-white/[0.06] first:border-t-0">{r.text}<CiteLink id={ep.id} cite={r.cite} /></li>)}</ul>
+          {p.action && <p className="text-[12px] text-muted-foreground"><b className="text-foreground mr-1.5">대응</b>{p.action}</p>}
+        </div>)}
         {ep.guest && <>
           <h3 className="text-xs text-muted-foreground font-semibold mt-5 mb-1">{`게스트 · ${ep.guest.name}${ep.guest.firm ? ' · ' + ep.guest.firm : ''}`}</h3>
-          <p className="text-[13px] font-semibold">{ep.guest.headline}</p>
+          <p className="flex gap-2 items-baseline text-[13px] font-semibold">{ep.guest.bias && <BiasTag b={ep.guest.bias.bias} h={ep.guest.bias.horizon} />}{ep.guest.headline}</p>
           <ul>{(ep.guest.points ?? []).map((r, k) => <li key={k} className="text-[13px] py-[7px] border-t border-white/[0.06] first:border-t-0">{r.text}<CiteLink id={ep.id} cite={r.cite} /></li>)}</ul>
         </>}
         {list('차트·시황', ep.chart)}{list('핵심 포인트', ep.points)}
@@ -104,21 +153,27 @@ export function EpisodeDrawer({ ep, stocks, close }: { ep: Episode | null; stock
   </>
 }
 
-// 영상 요약 탭: 날짜별 타임라인 + 사람 필터
+// 영상 요약 탭: 날짜별 타임라인 + 사람·방송 필터 (방송 목록은 노트에 있는 show에서)
 const FILTERS = [['all', '전체'], ['alsangmu', '알상무'], ['shuka', '슈카'], ['wepoll', '위폴']] as const
 export function ShowsPage({ eps, stocks, open }: { eps: Episode[]; stocks: Stock[]; open: (ep: Episode) => void }) {
   const [f, setF] = useState<typeof FILTERS[number][0]>('all')
-  const list = eps.filter(e => f === 'all' || e.src === f)
+  const [show, setShow] = useState<string | null>(null)
+  const shows = f === 'all' ? [] : [...new Set(eps.filter(e => e.src === f).map(e => e.show).filter((s): s is string => !!s))]
+  const list = eps.filter(e => (f === 'all' || e.src === f) && (!show || e.show === show))
   const days = [...new Set(list.map(e => e.date))]
+  const pill = (on: boolean) => cn('glass rounded-full px-3 py-[7px] text-xs cursor-pointer', on ? 'bg-white/15 text-foreground' : 'text-muted-foreground')
   return <div className="flex flex-col gap-4">
+    <BiasTable eps={eps} open={open} />
     <div className="flex gap-1.5 flex-wrap">{FILTERS.map(([k, t]) =>
-      <button key={k} onClick={() => setF(k)} className={cn('glass rounded-full px-3 py-[7px] text-xs cursor-pointer', k === f ? 'bg-white/15 text-foreground' : 'text-muted-foreground')}>{t}</button>)}</div>
+      <button key={k} onClick={() => { setF(k); setShow(null) }} className={pill(k === f)}>{t}</button>)}</div>
+    {shows.length > 1 && <div className="flex gap-1.5 flex-wrap">{[null, ...shows].map(s =>
+      <button key={s ?? 'all'} onClick={() => setShow(s)} className={pill(s === show)}>{s ?? '모든 방송'}</button>)}</div>}
     {!list.length && <p className="text-muted-foreground">요약된 방송이 아직 없어요.</p>}
     {days.map(d => <div key={d} className="grid grid-cols-[110px_1fr] max-[720px]:grid-cols-1 gap-4">
       <div className="text-xs text-muted-foreground pt-3.5">{dateLabel(d)}</div>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-2.5">{list.filter(e => e.date === d).map(e =>
         <Card key={e.src + e.id} className="p-3.5 flex flex-col gap-2 cursor-pointer hover:bg-white/[0.08]" onClick={() => open(e)} role="button" tabIndex={0} onKeyDown={ev => ev.key === 'Enter' && open(e)}>
-          <Who ep={e} extra={e.guest ? '게스트 ' + e.guest.name : undefined} />
+          <Who ep={e} extra={e.guest ? '게스트 ' + e.guest.name : e.panel?.length ? e.panel.map(p => p.name).join('·') : undefined} />
           <div className="text-[13px] leading-[1.5] line-clamp-3">{e.headline}</div>
           <div className="flex flex-wrap gap-1.5">{topStocks(e, 5).map(c => <span key={c} className={chip}>{nameOf(c, stocks)}</span>)}</div>
         </Card>)}</div>

@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
-import { consensus, isRecent, saidFor, whoMentioned, type Episode, type Src } from './shows'
+import { biasBoard, consensus, isRecent, saidFor, whoMentioned, type Episode, type Src } from './shows'
 
 const ep = (src: Src, date: string, stocks: Record<string, string[]>): Episode => ({
   src, date, id: src + date, title: '', headline: '',
@@ -34,5 +34,16 @@ describe('shows', () => {
   it('consensus: 7일 안에 두 사람 이상', () => {
     expect(consensus(eps).map(([code, who]) => [code, [...who]])).toEqual([['005930', ['shuka', 'wepoll']], ['MU', ['wepoll', 'alsangmu']]])
     expect(consensus(eps.slice(0, 1))).toEqual([])
+  })
+
+  it('biasBoard: 진행자 먼저, 게스트·패널은 최근 순, 2주 밖은 뺀다', () => {
+    const b = (bias: '롱' | '숏' | '중립') => ({ bias })
+    const board = biasBoard([
+      { ...ep('shuka', '2026-11-02', {}), panel: [{ name: '김장열', bias: '롱', view: '락바텀', reasons: [] }] },
+      { ...ep('wepoll', '2026-11-01', {}), bias: b('중립'), guest: { name: '강재구', headline: '', points: [], bias: b('롱') } },
+      { ...ep('alsangmu', '2026-10-31', {}), bias: b('숏') },
+      { ...ep('alsangmu', '2026-10-01', {}), bias: b('롱') },
+    ])
+    expect(board.map(([who, vs]) => [who, vs.map(v => v.bias)])).toEqual([['알상무', ['숏']], ['박종훈', ['중립']], ['김장열', ['롱']], ['강재구', ['롱']]])
   })
 })

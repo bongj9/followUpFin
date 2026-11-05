@@ -8,7 +8,7 @@ import { FlowChart } from '@/components/FlowChart'
 import { Investors } from '@/components/Investors'
 import { MorningReport, ReportHero } from '@/components/MorningReport'
 import { OrderBook } from '@/components/OrderBook'
-import { Consensus, EpisodeDrawer, Mentions, ShowCard, ShowsPage } from '@/components/Shows'
+import { BiasBoard, Consensus, EpisodeDrawer, Mentions, ShowCard, ShowsPage } from '@/components/Shows'
 import { StockChart } from '@/components/StockChart'
 import { StockHead } from '@/components/StockHead'
 import { Ticker } from '@/components/Ticker'
@@ -124,6 +124,7 @@ export default function App() {
                     {(['alsangmu', 'shuka', 'wepoll'] as const).map(s => <ShowCard key={s} src={s} eps={eps} stocks={stocks} open={setEp} />)}
                   </div>
                 </Section>
+                <Section title="누가 롱, 누가 숏" sub="최근 2주 · 진행자와 게스트·패널별 · 누르면 그 방송"><BiasBoard eps={eps} open={setEp} /></Section>
                 <Section title="여럿이 같이 언급한 종목" sub="최근 7일 · 누르면 종목별 발언"><Consensus eps={eps} stocks={stocks} /></Section>
                 <Section title="알상무 코스피 판정" sub="알상무 차트 규칙으로 본 오늘 코스피"><AlsangmuView code={null} stocks={stocks} tick={tick} /></Section>
               </>}
