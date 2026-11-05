@@ -4,7 +4,7 @@ import type { Cited, Stock } from '@/api'
 import { yt } from '@/components/AlsangmuView'
 import { Card } from '@/components/ui/card'
 import { cn, fmt } from '@/lib/format'
-import { biasBoard, consensus, dateLabel, nameOf, saidFor, WHO, type Episode, type Src } from '@/lib/shows'
+import { biasBoard, biasByDate, consensus, dateLabel, nameOf, saidFor, WHO, type Episode, type Src } from '@/lib/shows'
 
 // 방송 요약 화면들 (views/*.json, git 제외: 실존 인물 영상을 편마다 요약한 개인 공부 노트). 그들의 말을 옮긴 것이고 판단은 본인 몫
 const go = (code: string) => { location.hash = '#/stock/' + encodeURIComponent(code) }
@@ -77,6 +77,27 @@ export function BiasBoard({ eps, open }: { eps: Episode[]; open: (ep: Episode) =
     </li>)}</ul></Card>
 }
 
+// 날짜 × 사람 롱·숏 표 (영상 요약 탭 맨 위). 칸을 누르면 그 방송
+const COLS = [...Object.keys(WHO), 'guest'] as const
+export function BiasTable({ eps, open }: { eps: Episode[]; open: (ep: Episode) => void }) {
+  const rows = biasByDate(eps)
+  if (!rows.length) return null
+  const th = 'text-left text-[11px] text-muted-foreground font-semibold px-3 py-2'
+  return <Card className="p-0 overflow-x-auto">
+    <table className="w-full text-[12px] min-w-[640px]">
+      <thead><tr><th className={th}>날짜</th>{COLS.map(c => <th key={c} className={th}>{c === 'guest' ? '게스트·패널' : WHO[c as Src].who}</th>)}</tr></thead>
+      <tbody>{rows.map(([date, vs]) => <tr key={date} className="border-t border-white/[0.06] align-top">
+        <td className="px-3 py-2 tnum text-muted-foreground whitespace-nowrap">{md(date)}</td>
+        {COLS.map(c => <td key={c} className="px-3 py-2"><div className="flex flex-wrap gap-1.5">
+          {vs.filter(v => c === 'guest' ? v.who !== WHO[v.src].who : v.who === WHO[c as Src].who).map((v, k) =>
+            <button key={k} title={v.why} className="flex gap-1 items-center cursor-pointer hover:opacity-80" onClick={() => open(v.ep)}>
+              {c === 'guest' && <span>{v.who}</span>}<BiasTag b={v.bias} h={c === 'guest' ? null : v.horizon} />
+              {c !== 'guest' && v.ep.show && <span className="text-[10px] text-muted-foreground">{v.ep.show}</span>}</button>)}
+        </div></td>)}
+      </tr>)}</tbody>
+    </table></Card>
+}
+
 export function Consensus({ eps, stocks }: { eps: Episode[]; stocks: Stock[] }) {
   const list = consensus(eps).slice(0, 12)
   if (!list.length) return null
@@ -142,6 +163,7 @@ export function ShowsPage({ eps, stocks, open }: { eps: Episode[]; stocks: Stock
   const days = [...new Set(list.map(e => e.date))]
   const pill = (on: boolean) => cn('glass rounded-full px-3 py-[7px] text-xs cursor-pointer', on ? 'bg-white/15 text-foreground' : 'text-muted-foreground')
   return <div className="flex flex-col gap-4">
+    <BiasTable eps={eps} open={open} />
     <div className="flex gap-1.5 flex-wrap">{FILTERS.map(([k, t]) =>
       <button key={k} onClick={() => { setF(k); setShow(null) }} className={pill(k === f)}>{t}</button>)}</div>
     {shows.length > 1 && <div className="flex gap-1.5 flex-wrap">{[null, ...shows].map(s =>

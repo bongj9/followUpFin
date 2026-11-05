@@ -74,4 +74,11 @@ export function biasBoard(eps: Episode[], days = 14, now = Date.now()) {
   return [...by].sort((a, b) => rank(a[0]) - rank(b[0]) || b[1][0].ep.date.localeCompare(a[1][0].ep.date))
 }
 
-export const dateLabel =(date: string) => new Date(date + 'T00:00:00').toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })
+// 같은 뷰를 날짜별로 (최신 날짜 먼저)
+export function biasByDate(eps: Episode[], days = 14, now = Date.now()) {
+  const by = new Map<string, View[]>()
+  for (const v of views(eps)) if ((now - +new Date(v.ep.date + 'T00:00:00')) / 864e5 < days) by.set(v.ep.date, [...(by.get(v.ep.date) ?? []), v])
+  return [...by].sort((a, b) => b[0].localeCompare(a[0]))
+}
+
+export const dateLabel = (date: string) => new Date(date + 'T00:00:00').toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })
