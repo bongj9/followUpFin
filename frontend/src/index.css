@@ -63,3 +63,9 @@ a.cite { font-size: 11px; color: var(--color-link); text-decoration: none; white
 /* 종목 페이지 격자: 헤더, 요약, 차트·뷰·발언·아래칸 | 피드 */
 .page-stock { grid-template-columns: minmax(0, 1fr) 380px; grid-template-areas: "head head" "peek peek" "chart feed" "view feed" "said feed" "below feed"; }
 @media (max-width: 1100px) { .page-stock { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "peek" "chart" "view" "said" "feed" "below"; } }
+
+/* 지표 줄: 같은 줄을 두 번 이어 붙여 왼쪽으로 계속 흐른다. 마우스를 올리면 멈춘다 */
+@keyframes ticker { to { transform: translateX(-50%); } }
+.ticker { animation: ticker 40s linear infinite; }
+.ticker:hover { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) { .ticker { animation: none; } }
