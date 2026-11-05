@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getNote, getShow, type Cited, type Daily, type Stock } from '@/api'
+import { getNote, getShow, type Bias, type Cited, type Daily, type Stock } from '@/api'
 
 // 세 노트(알상무·슈카·위폴)의 방송을 한 목록으로. 개요 카드·영상 요약·종목 발언 타임라인·오른쪽 패널이 같이 쓴다
 export type Src = 'alsangmu' | 'shuka' | 'wepoll'
@@ -9,7 +9,7 @@ export interface Said extends Cited { ep: Episode }
 export const WHO: Record<Src, { who: string; ini: string; color: string; sub: string }> = {
   alsangmu: { who: '알상무', ini: '알', color: 'var(--color-al)', sub: '당일전략·지표추적자·RTS' },
   shuka: { who: '슈카', ini: '슈', color: 'var(--color-sh)', sub: '머니코믹스 슈황' },
-  wepoll: { who: '박종훈의 바이킹스', ini: '위', color: 'var(--color-wp)', sub: '위폴 아침 라이브' },
+  wepoll: { who: '박종훈', ini: '위', color: 'var(--color-wp)', sub: '위폴 바이킹스' },
 }
 
 export function useShows(tick: number) {
@@ -55,4 +55,23 @@ export function consensus(eps: Episode[]) {
   return [...by].filter(([, s]) => s.size >= 2).sort((a, b) => b[1].size - a[1].size)
 }
 
-export const dateLabel = (date: string) => new Date(date + 'T00:00:00').toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })
+// 누가 어느 날 롱·숏·중립으로 봤나. 진행자, 위폴 게스트, 패널을 한 줄씩 펼친다
+export interface View { who: string; sub?: string; src: Src; bias: Bias['bias']; horizon?: string | null; why?: string; ep: Episode }
+export function views(eps: Episode[]): View[] {
+  return eps.flatMap(ep => [
+    ...(ep.bias ? [{ who: WHO[ep.src].who, src: ep.src, ...ep.bias, ep }] : []),
+    ...(ep.guest?.bias ? [{ who: ep.guest.name, sub: ep.guest.firm, src: ep.src, ...ep.guest.bias, ep }] : []),
+    ...(ep.panel ?? []).map(p => ({ who: p.name, sub: p.role, src: ep.src, bias: p.bias, horizon: p.horizon, why: p.view, ep })),
+  ])
+}
+
+// 최근 days일 안의 뷰를 사람별로 묶는다. 진행자 셋이 먼저, 나머지는 최근에 나온 순. 한 사람 안은 최신순
+export function biasBoard(eps: Episode[], days = 14, now = Date.now()) {
+  const hosts = Object.values(WHO).map(w => w.who)
+  const by = new Map<string, View[]>()
+  for (const v of views(eps)) if ((now - +new Date(v.ep.date + 'T00:00:00')) / 864e5 < days) by.set(v.who, [...(by.get(v.who) ?? []), v])
+  const rank = (who: string) => hosts.includes(who) ? hosts.indexOf(who) : hosts.length
+  return [...by].sort((a, b) => rank(a[0]) - rank(b[0]) || b[1][0].ep.date.localeCompare(a[1][0].ep.date))
+}
+
+export const dateLabel =(date: string) => new Date(date + 'T00:00:00').toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })

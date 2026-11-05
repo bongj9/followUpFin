@@ -39,11 +39,20 @@ export interface ImportResult { added: string[]; failed: string[] }
 // 알상무 노트 (views/alsangmu.json, git 제외)
 export interface Cited { text: string; cite: string }
 export interface NoteLevel { price: number; text: string; cite: string }
+// 그 편에서 그가 시장을 어느 쪽으로 봤나 (요약 스킬이 판정)
+export interface Bias { bias: '롱' | '숏' | '중립'; horizon?: string | null; why?: string }
+// 「주식은 지금」 같은 패널 방송의 패널 한 명
+export interface Panelist {
+  name: string; role?: string; topic?: string; bias: Bias['bias']; horizon?: string | null
+  view: string; reasons: Cited[]; action?: string | null
+}
 export interface Daily {
   date: string; id: string; title: string; headline: string; show?: string
   stance?: { cash?: string | null; odds?: string | null; action?: string | null }
+  bias?: Bias | null
   chart?: Cited[]; points?: Cited[]; levels?: NoteLevel[]; stocks?: Record<string, Cited[]>
-  guest?: { name: string; firm?: string; headline: string; points: Cited[] } | null // 위폴 버디버디 게스트
+  guest?: { name: string; firm?: string; headline: string; points: Cited[]; bias?: Bias | null } | null // 위폴 버디버디 게스트
+  panel?: Panelist[]
 }
 export interface Note {
   name: string; source: string; asOf: string; videos: Record<string, string>; summary: string
