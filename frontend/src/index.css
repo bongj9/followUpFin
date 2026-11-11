@@ -43,8 +43,12 @@ body {
     radial-gradient(50% 50% at 60% 95%, rgba(70,55,40,0.48), transparent 70%), var(--color-background);
   background-attachment: fixed;
 }
-/* 유리 카드·알약 (카드 컴포넌트 밖에서도 쓴다) */
-.glass { background: var(--color-card); border: 1px solid var(--color-border); backdrop-filter: blur(22px) saturate(140%); -webkit-backdrop-filter: blur(22px) saturate(140%); }
+/* 유리 카드·알약 (카드 컴포넌트 밖에서도 쓴다)
+   components 층에 둬야 bg-* 같은 유틸리티가 이긴다. 층 밖에 두면 이 background가 모든 bg-*를 덮어서
+   오른쪽 방송 패널이 거의 투명해져 뒤 글씨와 겹쳤다 (선택된 필터·카드 hover 배경도 안 보였다) */
+@layer components {
+  .glass { background: var(--color-card); border: 1px solid var(--color-border); backdrop-filter: blur(22px) saturate(140%); -webkit-backdrop-filter: blur(22px) saturate(140%); }
+}
 .up { color: var(--color-up); } .down { color: var(--color-down); }
 .tnum { font-variant-numeric: tabular-nums; }
 

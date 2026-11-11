@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { ChartBar, House, Newspaper, Play, Star, Sunrise, Users, Wallet } from 'lucide-react'
+import { ChartBar, ClipboardList, House, MonitorPlay, Newspaper, Star, Users, Wallet } from 'lucide-react'
 import { getQuotes, getStocks, onStream, stream, type Quote, type Stock } from '@/api'
 import { Account, useAccount, won } from '@/components/Account'
 import { AlsangmuView } from '@/components/AlsangmuView'
@@ -25,8 +25,9 @@ export type Quotes = Record<string, Quote>
 
 // 주소로 화면을 정한다: #/ 개요, #/watch 관심 종목, #/shows 영상 요약, #/report 아침 리포트, #/feed 피드, #/account 계좌,
 // #/stock/005930 종목, #/industry/이름 업종 피드. 새로고침·뒤로가기·링크 공유가 된다
-const PAGES = [['', '개요', House], ['watch', '관심 종목', Star], ['shows', '영상 요약', Play], ['report', '아침 리포트', Sunrise],
-  ['feed', '피드', Newspaper], ['account', '계좌', Wallet]] as const
+// [주소, 위 메뉴 이름, 왼쪽 아이콘, 왼쪽 아이콘 밑 짧은 이름]. 아이콘만으론 뜻이 안 읽혀서(해돋이=아침 리포트) 이름을 같이 단다
+const PAGES = [['', '개요', House, '개요'], ['watch', '관심 종목', Star, '관심'], ['shows', '영상 요약', MonitorPlay, '영상'],
+  ['report', '아침 리포트', ClipboardList, '리포트'], ['feed', '피드', Newspaper, '피드'], ['account', '계좌', Wallet, '계좌']] as const
 type Page = typeof PAGES[number][0] | 'stock' | 'industry'
 function parseHash(): { page: Page; selected: Selected } {
   const [, kind = '', value] = location.hash.match(/^#\/(\w*)(?:\/(.+))?$/) ?? []
@@ -104,9 +105,10 @@ export default function App() {
         </nav>
         <span className="text-[11px] text-muted-foreground text-right">{live}<span className="block max-[720px]:hidden">{updated}</span></span>
       </header>
-      <nav className="glass fixed left-4 top-1/2 -translate-y-1/2 z-10 flex flex-col gap-1.5 px-[5px] py-2 rounded-full max-[720px]:hidden">
-        {PAGES.map(([k, t, Icon]) => <a key={k} href={'#/' + k} title={t}
-          className={cn('grid place-items-center w-[30px] h-[30px] rounded-full', k === tab ? 'bg-white/10 text-foreground' : 'text-muted-foreground hover:text-foreground')}><Icon size={15} /></a>)}
+      <nav className="glass fixed left-3 top-1/2 -translate-y-1/2 z-10 flex flex-col gap-1 p-1.5 rounded-[22px] max-[720px]:hidden">
+        {PAGES.map(([k, t, Icon, short]) => <a key={k} href={'#/' + k} title={t}
+          className={cn('flex flex-col items-center gap-1 w-11 py-2 rounded-2xl text-[10px] leading-none', k === tab ? 'bg-white/10 text-foreground' : 'text-muted-foreground hover:text-foreground')}>
+          <Icon size={16} />{short}</a>)}
       </nav>
 
       <main className="px-7 pt-[22px] pb-12 pl-[76px] max-w-[1480px] max-[720px]:px-4">

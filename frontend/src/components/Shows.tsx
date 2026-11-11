@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import type { Cited, Stock } from '@/api'
 import { yt } from '@/components/AlsangmuView'
@@ -20,10 +20,16 @@ export const Avatars = ({ list }: { list: Src[] }) =>
 
 const CiteLink = ({ id, cite }: { id: string; cite?: string }) => cite
   ? <a className="cite" target="_blank" rel="noopener" href={yt(id, cite)} onClick={e => e.stopPropagation()}>{'▶ ' + cite}</a> : null
+// 요약 아래에 그가 실제로 한 말 (왼쪽 줄로 요약과 구분)
+const Quote = ({ q }: { q?: string }) => q
+  ? <span className="block mt-1.5 pl-3 border-l-2 border-primary/40 text-[13px] leading-[1.6] text-muted-foreground">{`“${q}”`}</span> : null
 
 function Stance({ ep, full }: { ep: Episode; full?: boolean }) {
   const rows = ([['분위기', ep.stance?.odds], ['대응', ep.stance?.action], ['현금', ep.stance?.cash]] as const).filter(([, v]) => v)
   if (!rows.length) return null
+  // 상세 패널: 이름표 | 내용 두 칸으로 읽기 쉽게
+  if (full) return <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 rounded-xl bg-white/[0.04] px-3.5 py-3 text-[13px] leading-[1.6]">
+    {rows.map(([k, v]) => <Fragment key={k}><dt className="font-semibold text-muted-foreground whitespace-nowrap">{k}</dt><dd className="text-foreground/90">{v}</dd></Fragment>)}</dl>
   return <div className="flex flex-col gap-1.5">{rows.map(([k, v]) =>
     <div key={k} className="text-[11px] px-2.5 py-[7px] rounded-xl bg-white/[0.045] text-muted-foreground">
       <p className={cn(!full && 'line-clamp-2')}><b className="text-foreground mr-1.5">{k}</b>{v}</p></div>)}</div>
@@ -106,48 +112,69 @@ export function Consensus({ eps, stocks }: { eps: Episode[]; stocks: Stock[] }) 
       <Avatars list={[...s]} />{nameOf(c, stocks)}<span className="text-muted-foreground text-[11px]">{`${s.size}명`}</span></button>)}</div>
 }
 
+// 게스트·패널 이름 (카드·패널 머리에 같이 쓴다)
+const guests = (ep: Episode) => ep.guest ? '게스트 ' + ep.guest.name : ep.panel?.length ? ep.panel.map(p => p.name).join('·') : undefined
+
+// 상세 패널의 한 구역: 라임 막대 + 굵은 제목으로 구역이 한눈에 갈린다
+function Sec({ title, sub, className, children }: { title: string; sub?: string; className?: string; children: ReactNode }) {
+  return <section className={cn('mt-8', className)}>
+    <h3 className="flex items-center gap-2 text-[14px] font-bold mb-1"><span className="w-1 h-3.5 rounded-full bg-primary shrink-0" />{title}
+      {sub && <span className="text-[12px] font-normal text-muted-foreground truncate">{sub}</span>}</h3>
+    {children}</section>
+}
+// 요약 한 줄씩. 한글 문단이라 줄 간격을 넉넉히
+const Rows = ({ id, rows }: { id: string; rows: Cited[] }) =>
+  <ul>{rows.map((r, k) => <li key={k} className="text-[14px] leading-[1.7] text-foreground/90 py-2.5 border-t border-white/[0.06] first:border-t-0">
+    {r.text}<CiteLink id={id} cite={r.cite} /><Quote q={r.quote} /></li>)}</ul>
+const Lead = ({ children }: { children: ReactNode }) => <p className="flex gap-2 items-baseline text-[14px] font-semibold leading-[1.6] my-1.5">{children}</p>
+
 // 오른쪽에서 밀려 나오는 방송 상세. ESC·바깥 클릭으로 닫는다
+// 순서: 결론(헤드라인·롱숏·대응) → 팔로우 종목 얘기 → 패널 → 차트·시황 → 핵심 → 게스트 → 가격대 → 다룬 종목
 export function EpisodeDrawer({ ep, stocks, close }: { ep: Episode | null; stocks: Stock[]; close: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close()
     addEventListener('keydown', onKey)
     return () => removeEventListener('keydown', onKey)
   }, [close])
-  const list = (title: string, rows?: Cited[]) => !!rows?.length && <>
-    <h3 className="text-xs text-muted-foreground font-semibold mt-5 mb-1">{title}</h3>
-    <ul>{rows.map((r, k) => <li key={k} className="text-[13px] py-[7px] border-t border-white/[0.06] first:border-t-0">{r.text}<CiteLink id={ep!.id} cite={r.cite} /></li>)}</ul></>
+  // 팔로우 종목에 대해 한 말은 맨 위에서 바로 보여준다 (나머지 종목은 아래 칩)
+  const mine = Object.entries(ep?.stocks ?? {}).filter(([c]) => stocks.some(s => s.stockCode === c))
   return <>
     <div className={cn('fixed inset-0 z-30 bg-black/35 transition-opacity', ep ? 'opacity-100' : 'opacity-0 pointer-events-none')} onClick={close} />
-    <aside className={cn('glass fixed z-40 top-3 right-3 bottom-3 w-[min(520px,92vw)] rounded-[26px] p-[22px] overflow-y-auto bg-[rgba(28,24,20,0.78)] transition-transform duration-300',
+    {/* 읽는 패널이라 불투명하게: 반투명이면 뒤 표·카드 글씨가 비쳐 겹친다. 머리는 고정, 본문만 스크롤 */}
+    <aside className={cn('glass fixed z-40 top-3 right-3 bottom-3 w-[min(560px,94vw)] rounded-[26px] bg-card-solid flex flex-col overflow-hidden transition-transform duration-300',
       ep ? 'translate-x-0' : 'translate-x-[110%]')} aria-hidden={!ep} role="dialog" aria-modal="true">
       {ep && <>
-        <div className="flex justify-between items-center gap-3"><Who ep={ep} />
-          <button className="glass grid place-items-center w-8 h-8 rounded-full cursor-pointer" onClick={close} title="닫기" autoFocus><X size={15} /></button></div>
-        <a className="block text-[11px] text-muted-foreground mt-2.5" href={yt(ep.id)} target="_blank" rel="noopener">{ep.title + ' ↗'}</a>
-        <div className="text-[15px] font-semibold leading-[1.5] mt-3 mb-3">{ep.headline}</div>
-        <Stance ep={ep} full />
-        {ep.bias && <p className="flex gap-2 items-baseline text-[12px] text-muted-foreground mt-3"><BiasTag b={ep.bias.bias} h={ep.bias.horizon} />{ep.bias.why}</p>}
-        {ep.panel?.map((p, i) => <div key={i}>
-          <h3 className="text-xs text-muted-foreground font-semibold mt-5 mb-1">{[p.name, p.role, p.topic && `'${p.topic}'`].filter(Boolean).join(' · ')}</h3>
-          <p className="flex gap-2 items-baseline text-[13px] font-semibold"><BiasTag b={p.bias} h={p.horizon} />{p.view}</p>
-          <ul>{p.reasons.map((r, k) => <li key={k} className="text-[13px] py-[7px] border-t border-white/[0.06] first:border-t-0">{r.text}<CiteLink id={ep.id} cite={r.cite} /></li>)}</ul>
-          {p.action && <p className="text-[12px] text-muted-foreground"><b className="text-foreground mr-1.5">대응</b>{p.action}</p>}
-        </div>)}
-        {ep.guest && <>
-          <h3 className="text-xs text-muted-foreground font-semibold mt-5 mb-1">{`게스트 · ${ep.guest.name}${ep.guest.firm ? ' · ' + ep.guest.firm : ''}`}</h3>
-          <p className="flex gap-2 items-baseline text-[13px] font-semibold">{ep.guest.bias && <BiasTag b={ep.guest.bias.bias} h={ep.guest.bias.horizon} />}{ep.guest.headline}</p>
-          <ul>{(ep.guest.points ?? []).map((r, k) => <li key={k} className="text-[13px] py-[7px] border-t border-white/[0.06] first:border-t-0">{r.text}<CiteLink id={ep.id} cite={r.cite} /></li>)}</ul>
-        </>}
-        {list('차트·시황', ep.chart)}{list('핵심 포인트', ep.points)}
-        {!!ep.levels?.length && <>
-          <h3 className="text-xs text-muted-foreground font-semibold mt-5 mb-1">주요 가격대</h3>
-          <ul>{[...ep.levels].sort((a, b) => b.price - a.price).map((l, k) => <li key={k} className="flex gap-2.5 text-[13px] py-[7px] border-t border-white/[0.06] first:border-t-0">
-            <b className="text-primary min-w-16">{fmt(l.price)}</b><span>{l.text}<CiteLink id={ep.id} cite={l.cite} /></span></li>)}</ul></>}
-        {!!Object.keys(ep.stocks ?? {}).length && <>
-          <h3 className="text-xs text-muted-foreground font-semibold mt-5 mb-1.5">다룬 종목 · 누르면 종목별 발언</h3>
-          <div className="flex flex-wrap gap-1.5">{Object.keys(ep.stocks!).map(c =>
-            <button key={c} className={cn(chip, 'cursor-pointer hover:bg-white/15')} onClick={() => { close(); go(c) }}>{nameOf(c, stocks)}</button>)}</div></>}
-        <p className="text-[11px] text-muted-foreground mt-7">{`${WHO[ep.src].who} 방송에서 한 말을 요약한 것이에요. 자동 자막 기반이라 숫자·이름이 틀릴 수 있어요`}</p>
+        <header className="flex justify-between items-center gap-3 px-[22px] py-4 border-b border-white/[0.07]"><Who ep={ep} extra={guests(ep)} />
+          <button className="glass grid place-items-center w-8 h-8 rounded-full cursor-pointer shrink-0" onClick={close} title="닫기" autoFocus><X size={15} /></button></header>
+        <div className="flex-1 overflow-y-auto px-[22px] pt-4 pb-8">
+          <a className="text-[12px] text-muted-foreground hover:text-foreground" href={yt(ep.id)} target="_blank" rel="noopener">{ep.title + ' ↗'}</a>
+          <p className="text-[17px] font-semibold leading-[1.55] tracking-[-0.01em] mt-2.5">{ep.headline}</p>
+          {ep.bias && <p className="flex gap-2 items-baseline text-[13px] leading-[1.6] text-foreground/80 mt-3"><BiasTag b={ep.bias.bias} h={ep.bias.horizon} /><span>{ep.bias.why}</span></p>}
+          <div className="mt-4"><Stance ep={ep} full /></div>
+          {!!mine.length && <Sec title="팔로우 종목에 대해 한 말" className="rounded-2xl bg-primary-soft/50 px-4 pt-3.5 pb-1.5">
+            {mine.map(([c, rows]) => <div key={c} className="mt-2.5">
+              <button className="text-[13px] font-bold text-primary cursor-pointer hover:underline" onClick={() => { close(); go(c) }}>{nameOf(c, stocks)}</button>
+              <Rows id={ep.id} rows={rows} /></div>)}
+          </Sec>}
+          {ep.panel?.map((p, i) => <Sec key={i} title={p.name} sub={[p.role, p.topic && `'${p.topic}'`].filter(Boolean).join(' · ')}>
+            <Lead><BiasTag b={p.bias} h={p.horizon} /><span>{p.view}</span></Lead>
+            <Rows id={ep.id} rows={p.reasons} />
+            {p.action && <p className="text-[13px] leading-[1.6] text-foreground/80 mt-1"><b className="text-foreground mr-1.5">대응</b>{p.action}</p>}
+          </Sec>)}
+          {!!ep.chart?.length && <Sec title="차트·시황"><Rows id={ep.id} rows={ep.chart} /></Sec>}
+          {!!ep.points?.length && <Sec title="핵심 포인트"><Rows id={ep.id} rows={ep.points} /></Sec>}
+          {ep.guest && <Sec title={'게스트 · ' + ep.guest.name} sub={ep.guest.firm}>
+            <Lead>{ep.guest.bias && <BiasTag b={ep.guest.bias.bias} h={ep.guest.bias.horizon} />}<span>{ep.guest.headline}</span></Lead>
+            <Rows id={ep.id} rows={ep.guest.points ?? []} />
+          </Sec>}
+          {!!ep.levels?.length && <Sec title="주요 가격대">
+            <ul>{[...ep.levels].sort((a, b) => b.price - a.price).map((l, k) => <li key={k} className="flex gap-3 text-[14px] leading-[1.7] py-2 border-t border-white/[0.06] first:border-t-0">
+              <b className="text-primary tnum min-w-16">{fmt(l.price)}</b><span className="text-foreground/90">{l.text}<CiteLink id={ep.id} cite={l.cite} /></span></li>)}</ul></Sec>}
+          {!!Object.keys(ep.stocks ?? {}).length && <Sec title="다룬 종목" sub="누르면 종목별 발언">
+            <div className="flex flex-wrap gap-1.5 mt-2">{Object.keys(ep.stocks!).map(c =>
+              <button key={c} className={cn(chip, 'cursor-pointer hover:bg-white/15')} onClick={() => { close(); go(c) }}>{nameOf(c, stocks)}</button>)}</div></Sec>}
+          <p className="text-[11px] text-muted-foreground mt-8">{`${WHO[ep.src].who} 방송에서 한 말을 요약한 것이에요. 자동 자막 기반이라 숫자·이름이 틀릴 수 있어요`}</p>
+        </div>
       </>}
     </aside>
   </>
@@ -173,7 +200,7 @@ export function ShowsPage({ eps, stocks, open }: { eps: Episode[]; stocks: Stock
       <div className="text-xs text-muted-foreground pt-3.5">{dateLabel(d)}</div>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-2.5">{list.filter(e => e.date === d).map(e =>
         <Card key={e.src + e.id} className="p-3.5 flex flex-col gap-2 cursor-pointer hover:bg-white/[0.08]" onClick={() => open(e)} role="button" tabIndex={0} onKeyDown={ev => ev.key === 'Enter' && open(e)}>
-          <Who ep={e} extra={e.guest ? '게스트 ' + e.guest.name : e.panel?.length ? e.panel.map(p => p.name).join('·') : undefined} />
+          <Who ep={e} extra={guests(e)} />
           <div className="text-[13px] leading-[1.5] line-clamp-3">{e.headline}</div>
           <div className="flex flex-wrap gap-1.5">{topStocks(e, 5).map(c => <span key={c} className={chip}>{nameOf(c, stocks)}</span>)}</div>
         </Card>)}</div>
@@ -195,7 +222,7 @@ export function Mentions({ code, eps, aliases, open, className }:
         <Avatar src={r.ep.src} small />
         <div><button className="text-[11px] text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => open(r.ep)}>
           {`${dateLabel(r.ep.date)} · ${WHO[r.ep.src].who}${r.ep.show ? ' ' + r.ep.show : ''}`}</button>
-          <div>{r.text}<CiteLink id={r.ep.id} cite={r.cite} /></div></div>
+          <div>{r.text}<CiteLink id={r.ep.id} cite={r.cite} /><Quote q={r.quote} /></div></div>
       </li>)}</ul>
     </Card>
   )

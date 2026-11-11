@@ -26,8 +26,10 @@ export function useShows(tick: number) {
 }
 
 // 노트의 종목 키는 국내는 코드, 미국은 티커, 일부는 이름 그대로다
-// 슈카 요약 지시(daily-prompt.md)의 코드표 + 노트에 나온 코드
-const KR: Record<string, string> = {
+// 슈카 요약 지시(daily-prompt.md)의 코드표 + 노트에 나온 코드. 미국 종목도 짧은 한글 이름으로 ("Advanced Micro Devices, Inc." 대신 AMD)
+const NAMES: Record<string, string> = {
+  MU: '마이크론', SNDK: '샌디스크', AMD: 'AMD', NVDA: '엔비디아', ORCL: '오라클', TSLA: '테슬라', INTC: '인텔', AAPL: '애플', PLTR: '팔란티어',
+  MSFT: '마이크로소프트', GOOGL: '구글', META: '메타', AMZN: '아마존', AVGO: '브로드컴', TSM: 'TSMC', CRWV: '코어위브',
   '000270': '기아', '000660': 'SK하이닉스', '000810': '삼성화재', '003550': 'LG', '005380': '현대차', '005930': '삼성전자', '006400': '삼성SDI',
   '009150': '삼성전기', '010120': 'LS ELECTRIC', '010140': '삼성중공업', '012450': '한화에어로스페이스', '017670': 'SK텔레콤', '028260': '삼성물산',
   '032830': '삼성생명', '034020': '두산에너빌리티', '035420': 'NAVER', '035720': '카카오', '042660': '한화오션', '042700': '한미반도체', '051910': 'LG화학',
@@ -35,7 +37,7 @@ const KR: Record<string, string> = {
   '105560': 'KB금융', '196170': '알테오젠', '207940': '삼성바이오로직스', '247540': '에코프로비엠', '267260': 'HD현대일렉트릭', '272210': '한화시스템',
   '329180': 'HD현대중공업', '373220': 'LG에너지솔루션',
 }
-export const nameOf = (code: string, stocks: Stock[]) => stocks.find(s => s.stockCode === code)?.name ?? KR[code] ?? code
+export const nameOf = (code: string, stocks: Stock[]) => NAMES[code] ?? stocks.find(s => s.stockCode === code)?.name ?? code
 
 // 이 종목에 대해 한 말. 레버리지 ETF(MUU 등)는 기초 종목(MU) 발언을 같이 본다. 최신순
 export function saidFor(eps: Episode[], aliases: Record<string, string>, code: string): Said[] {
