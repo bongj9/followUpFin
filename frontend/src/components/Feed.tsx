@@ -102,6 +102,18 @@ function FeedItem({ item, select }: { item: Item; select: (s: Selected) => void 
     setTranslating(null)
   }
 
+  // 급등락: '원인 분석'을 누르면 서버가 그 시점 앞뒤 뉴스·공시 제목을 모아 Claude에게 묻는다
+  const [why, setWhy] = useState<string | null>(null)
+  async function explain(e: React.MouseEvent) {
+    e.stopPropagation() // 카드를 누르면 종목 피드로 가는 동작은 막는다
+    setWhy('분석 중…')
+    const res = await fetch('/api/moves/explain', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stockCode: i.stockCode, move: i.title, at: i.at }),
+    })
+    setWhy(res.ok ? (await res.json()).text : '분석 실패: ' + await errorText(res))
+  }
+
   const move = i.type === 'MOVE'
   return (
     <div className={cn('px-2 py-3.5 border-b border-muted last:border-b-0', move && 'bg-warn-soft rounded-xl border-b-transparent mb-1 cursor-pointer')}
@@ -115,12 +127,14 @@ function FeedItem({ item, select }: { item: Item; select: (s: Selected) => void 
         {/* DART는 접수 시각을 주지 않아 날짜만 (SEC는 초 단위 접수 시각이 있어 시각까지) */}
         <span>{new Date(i.at).toLocaleString('ko-KR', i.source === 'DART' ? { month: 'numeric', day: 'numeric' } : { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
         {i.newsId && !i.originalTitle && <Button variant="soft" size="sm" className="ml-auto font-normal" disabled={!!translating} onClick={translate}>{translating ?? '번역'}</Button>}
+        {move && i.stockCode && <Button variant="soft" size="sm" className="ml-auto font-normal" disabled={why === '분석 중…'} onClick={explain}>원인 분석</Button>}
       </div>
       {i.url
         ? <a className="block font-semibold my-1 hover:text-primary" href={i.url} target="_blank" rel="noopener noreferrer">{i.title}</a>
         : <div className={cn('my-1', move && 'font-bold')}>{i.title}</div>}
       {i.originalTitle && <p className="mt-0.5 mb-1 text-xs text-muted-foreground">원문: {i.originalTitle}</p>}
       <p className="text-[13px] text-muted-foreground">{i.summary}</p>
+      {why && <p className="mt-2 px-3 py-2 bg-background/60 rounded-[10px] text-[13px] whitespace-pre-line cursor-auto" onClick={e => e.stopPropagation()}>{why}</p>}
       {i.tip && <p className="mt-2 px-3 py-2 bg-warn-soft rounded-[10px] text-warn text-[13px]">볼 것: {i.tip}</p>}
     </div>
   )

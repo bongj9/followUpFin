@@ -37,7 +37,7 @@ export interface MarketFlow { date: string; individual: number; foreigner: numbe
 export interface ImportResult { added: string[]; failed: string[] }
 
 // 알상무 노트 (views/alsangmu.json, git 제외)
-export interface Cited { text: string; cite: string }
+export interface Cited { text: string; cite: string; quote?: string } // quote: 그가 실제로 한 말 (종목 발언에만)
 export interface NoteLevel { price: number; text: string; cite: string }
 // 그 편에서 그가 시장을 어느 쪽으로 봤나 (요약 스킬이 판정)
 export interface Bias { bias: '롱' | '숏' | '중립'; horizon?: string | null; why?: string }

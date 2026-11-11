@@ -2,6 +2,8 @@
 # 평일 08:30 launchd가 부르고, 못 만들었을 때를 대비해 09:30·10:30에도 부른다 (~/Library/LaunchAgents/com.bongj9.morning-report.plist, 로그 ~/Library/Logs/morning-report.log)
 # 사람 없이 돌아서 권한 확인을 건너뛴다
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" # launchd는 .zshrc를 안 읽는다 (claude·node·docker)
+# 로그인 세션은 만료된다. 'claude setup-token'으로 만든 장기 토큰이 있으면 쓴다 (git 밖, 권한 600)
+[ -f ~/.config/claude-token ] && export CLAUDE_CODE_OAUTH_TOKEN="$(<~/.config/claude-token)"
 cd "${0:A:h}/../../.." || exit 1
 today=$(TZ=Asia/Seoul date +%F)
 curl -sf --max-time 5 localhost:8080/views/report.json | grep -q "\"date\": \"$today\"" && exit 0 # 오늘 것 이미 있음 (launchd는 볼트 파일을 못 읽어서 앱 서버로 읽는다)
