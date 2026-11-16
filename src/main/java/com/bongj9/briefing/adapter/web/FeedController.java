@@ -28,17 +28,21 @@ class FeedController {
         this.moveExplainer = moveExplainer;
     }
 
-    // POST /api/moves/explain {stockCode, move: 피드의 급등락 제목, at: 감지 시각} → {text: Claude가 쓴 원인 설명}
+    // POST /api/moves/explain {stockCode, at: 피드가 준 감지 시각} → {text: Claude가 쓴 원인 설명}
+    // 기록된 급등락이 아니면 404 (Claude를 부르지 않는다)
     @PostMapping("/api/moves/explain")
     Explanation explain(@RequestBody ExplainRequest req) {
-        if (req.stockCode() == null || !req.stockCode().matches("\\d{6}|[A-Z][A-Z0-9.-]{0,9}")
-                || req.move() == null || req.move().isBlank() || req.move().length() > 200 || req.at() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "stockCode(005930·AAPL), move(200자 이하), at이 필요해요");
+        if (req.stockCode() == null || req.at() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "stockCode, at이 필요해요");
         }
-        return new Explanation(moveExplainer.explain(req.stockCode(), req.move(), req.at()));
+        try {
+            return new Explanation(moveExplainer.explain(req.stockCode(), req.at()));
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        }
     }
 
-    record ExplainRequest(String stockCode, String move, Instant at) {
+    record ExplainRequest(String stockCode, Instant at) {
     }
 
     record Explanation(String text) {
