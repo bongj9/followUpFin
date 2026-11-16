@@ -116,7 +116,7 @@ export function Consensus({ eps, stocks }: { eps: Episode[]; stocks: Stock[] }) 
 const guests = (ep: Episode) => ep.guest ? '게스트 ' + ep.guest.name : ep.panel?.length ? ep.panel.map(p => p.name).join('·') : undefined
 
 // 상세 패널의 한 구역: 라임 막대 + 굵은 제목으로 구역이 한눈에 갈린다
-function Sec({ title, sub, className, children }: { title: string; sub?: string; className?: string; children: ReactNode }) {
+export function Sec({ title, sub, className, children }: { title: string; sub?: string; className?: string; children: ReactNode }) {
   return <section className={cn('mt-8', className)}>
     <h3 className="flex items-center gap-2 text-[14px] font-bold mb-1"><span className="w-1 h-3.5 rounded-full bg-primary shrink-0" />{title}
       {sub && <span className="text-[12px] font-normal text-muted-foreground truncate">{sub}</span>}</h3>

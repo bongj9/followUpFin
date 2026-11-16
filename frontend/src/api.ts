@@ -68,12 +68,16 @@ export interface Note {
 export interface ReportCall { if: string; then: string }
 export interface ReportHolding {
   code: string; name: string; action: string; weightPct: number | null; targetPct?: number | null
+  // weightPct는 주식 안에서의 비중, targetPct는 주식+현금 전체에서의 비중
+  valueKrw?: number | null; price?: number | null // 리포트 쓴 시각의 원화 평가액·가격 ('리포트대로 했으면' 계산에 씀)
   why: string[]; watch: ReportCall[]; alsangmu?: string | null
+  todo?: { when: string; what: string } | null // 오늘 할 일 (없으면 유지)
 }
 export interface Report {
   date: string; generatedAt: string; headline: string
   market: { stance: string; cashPct?: number | null; why: string[]; watch: ReportCall[] }
   holdings: ReportHolding[]
+  account?: { stockKrw: number; cashKrw: number | null } | null // 리포트 쓴 시각의 주식 평가액 합·현금 (원)
   alsangmu?: { date: string; show: string; headline: string } | null
   review?: { date: string; call: string; result: string }[]
 }

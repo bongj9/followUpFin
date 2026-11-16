@@ -40,7 +40,8 @@ export function Feed({ selected, tick, select, className, followed = true }: { s
       {feedType === 'MARKET' && <MarketRead tick={tick} />}
       {disclosures ? <Disclosures code={code} nonce={nonce} select={select} />
         : items && (items.length
-          ? items.map((i, k) => <FeedItem key={(i.url ?? i.title) + k} item={i} select={select} />)
+          // 급등락 카드는 종목+시각으로 구분한다: 목록 번호를 넣으면 위에 새 항목이 낄 때 카드가 새로 만들어져 받아 둔 원인 분석이 사라진다
+          ? items.map((i, k) => <FeedItem key={i.type === 'MOVE' ? 'MOVE' + i.stockCode + i.at : (i.url ?? i.title) + k} item={i} select={select} />)
           : <div className={empty}>{followed || feedType === 'MARKET' ? '이 탭에 해당하는 항목이 없어요.' : '관심 종목에 추가하면 뉴스를 모으기 시작해요.'}</div>)}
     </Card>
   )
@@ -107,11 +108,15 @@ function FeedItem({ item, select }: { item: Item; select: (s: Selected) => void 
   async function explain(e: React.MouseEvent) {
     e.stopPropagation() // 카드를 누르면 종목 피드로 가는 동작은 막는다
     setWhy('분석 중…')
-    const res = await fetch('/api/moves/explain', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ stockCode: i.stockCode, move: i.title, at: i.at }),
-    })
-    setWhy(res.ok ? (await res.json()).text : '분석 실패: ' + await errorText(res))
+    try {
+      const res = await fetch('/api/moves/explain', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stockCode: i.stockCode, at: i.at }),
+      })
+      setWhy(res.ok ? (await res.json()).text : '분석 실패: ' + await errorText(res))
+    } catch { // 서버가 꺼져 있는 등 요청 자체가 실패. 안 잡으면 '분석 중…'에 멈춰 버튼을 다시 못 누른다
+      setWhy('분석 실패: 서버에 연결하지 못했어요')
+    }
   }
 
   const move = i.type === 'MOVE'

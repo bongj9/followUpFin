@@ -38,6 +38,11 @@ public class IntradayMove {
         this.detectedAt = detectedAt;
     }
 
+    // 피드 제목이자 원인 분석 질문의 첫 줄 (예: "삼성전자 5분 새 +3.20% 급등")
+    public String describe(String name) {
+        return String.format("%s %d분 새 %+.2f%% %s", name, windowMinutes, changeRate, changeRate.signum() > 0 ? "급등" : "급락");
+    }
+
     public Long getId() { return id; }
     public String getStockCode() { return stockCode; }
     public BigDecimal getFromPrice() { return fromPrice; }

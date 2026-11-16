@@ -82,15 +82,13 @@ public class FeedService {
 
         Stream<FeedItem> moves = priceMoveRepository.findByStockCodeInAndDetectedAtAfter(names.keySet(), since).stream()
                 .map(m -> new FeedItem("MOVE", m.getStockCode(), names.get(m.getStockCode()), "토스증권",
-                        String.format("%s 전일 대비 %+.2f%% %s", names.get(m.getStockCode()), m.getChangeRate(),
-                                m.getChangeRate().signum() > 0 ? "급등" : "급락"),
+                        m.describe(names.get(m.getStockCode())),
                         "현재가 " + m.getLastPrice().toPlainString() + " " + m.getCurrency() + " · 눌러서 관련 뉴스 보기",
                         null, m.getDetectedAt()));
 
         Stream<FeedItem> intraday = intradayMoveRepository.findByStockCodeInAndDetectedAtAfter(names.keySet(), since).stream()
                 .map(m -> new FeedItem("MOVE", m.getStockCode(), names.get(m.getStockCode()), "토스증권",
-                        String.format("%s %d분 새 %+.2f%% %s", names.get(m.getStockCode()), m.getWindowMinutes(),
-                                m.getChangeRate(), m.getChangeRate().signum() > 0 ? "급등" : "급락"),
+                        m.describe(names.get(m.getStockCode())),
                         String.format("평소 %d분 변동 ±%.2f%%의 %.0f배 · %s → %s %s · 눌러서 관련 뉴스 보기", m.getWindowMinutes(),
                                 m.getNormalRate(), m.getChangeRate().abs().doubleValue() / Math.max(m.getNormalRate().doubleValue(), 0.01),
                                 m.getFromPrice().toPlainString(), m.getLastPrice().toPlainString(), m.getCurrency()),

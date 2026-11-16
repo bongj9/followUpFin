@@ -38,6 +38,11 @@ public class PriceMove {
         this.detectedAt = detectedAt;
     }
 
+    // 피드 제목이자 원인 분석 질문의 첫 줄 (예: "삼성전자 전일 대비 +7.30% 급등")
+    public String describe(String name) {
+        return String.format("%s 전일 대비 %+.2f%% %s", name, changeRate, changeRate.signum() > 0 ? "급등" : "급락");
+    }
+
     public Long getId() { return id; }
     public String getStockCode() { return stockCode; }
     public LocalDate getTradeDate() { return tradeDate; }
