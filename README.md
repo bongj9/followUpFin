@@ -22,7 +22,31 @@ H2(`./data/briefing`)를 쓰던 예전 버전의 관심종목·뉴스는 Postgre
 http://localhost:8080
 
 필요한 키: Finnhub(미국 뉴스), DART(국내 공시). 국내 뉴스는 키가 필요 없다.
-서버에서는 파일 대신 환경변수로 넣어도 된다 (`FINNHUB_API_KEY`, `DART_API_KEY`).
+
+## 상시 실행
+
+수집은 앱이 켜져 있는 동안만 10분마다 돈다. 꺼져 있던 동안의 공시는 어제·오늘 것만 다시 확인하고, 구글 뉴스는 최근 하루치만 가져온다.
+
+**이 맥** (회사 서버 전 임시): `./deploy/mac-install.sh` 한 번. 로그인하면 켜지고 죽으면 다시 켠다. 코드를 바꾼 뒤 다시 실행하면 새 버전으로 바뀐다. 상시 실행 중에는 8080이 차 있어 `bootRun`을 띄우려면 먼저 끈다 (`launchctl bootout gui/$(id -u)/com.bongj9.followupfin`).
+
+**회사 서버** (리눅스, Java 21 · PostgreSQL 16):
+
+```bash
+./gradlew bootJar                                   # 이 맥에서 빌드 (화면 포함)
+scp build/libs/followUpFin-0.0.1-SNAPSHOT.jar 서버:/tmp/followUpFin.jar
+# 서버에서
+sudo useradd -r -s /usr/sbin/nologin followupfin
+sudo install -d -o followupfin -m 700 /opt/followupfin
+sudo install -o followupfin -m 600 /tmp/followUpFin.jar /opt/followupfin/followUpFin.jar
+sudo install -o followupfin -m 600 secret.yml /opt/followupfin/secret.yml   # 키 + spring.datasource.url/password (서버 DB)
+sudo cp deploy/followupfin.service /etc/systemd/system/ && sudo systemctl daemon-reload
+sudo systemctl enable --now followupfin            # 로그: journalctl -u followupfin -f
+```
+
+- 키는 `secret.yml` 한 파일에 두고 앱 계정만 읽게 한다. Anthropic 키는 이 앱 전용으로 만들고 콘솔에서 월 지출 한도를 건다.
+- 서버에서 DART · 토스 · Finnhub · 구글 뉴스 · SEC · Anthropic API로 나가는 길이 열려 있어야 한다 (사내망 방화벽 확인).
+- 영상 요약·아침 리포트(`/views/*.json`)는 이 맥의 볼트 파일이라 서버엔 없다. 그 화면은 비어 보인다.
+- 기본은 127.0.0.1에서만 열린다. 다른 PC에서 보려면 `SERVER_ADDRESS=0.0.0.0`과 함께 인증부터 붙인다 (보유 수량이 보인다).
 
 ## 스택
 
