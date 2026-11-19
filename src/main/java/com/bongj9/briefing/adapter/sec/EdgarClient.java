@@ -1,5 +1,6 @@
 package com.bongj9.briefing.adapter.sec;
 
+import com.bongj9.briefing.adapter.HttpTimeouts;
 import com.bongj9.briefing.application.port.DisclosureSource;
 import com.bongj9.briefing.domain.DisclosureItem;
 import com.bongj9.briefing.domain.FollowedStock;
@@ -33,6 +34,7 @@ public class EdgarClient implements DisclosureSource {
     public EdgarClient(@Value("${sec.contact:}") String contact) {
         this.configured = !contact.isBlank();
         this.restClient = RestClient.builder()
+                .requestFactory(HttpTimeouts.factory())
                 .defaultHeader("User-Agent", "followUpFin " + contact)
                 .build();
     }

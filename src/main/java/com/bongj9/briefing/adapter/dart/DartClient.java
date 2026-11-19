@@ -1,5 +1,6 @@
 package com.bongj9.briefing.adapter.dart;
 
+import com.bongj9.briefing.adapter.HttpTimeouts;
 import com.bongj9.briefing.application.port.DisclosureSource;
 import com.bongj9.briefing.domain.DisclosureItem;
 import com.bongj9.briefing.domain.FollowedStock;
@@ -29,6 +30,7 @@ public class DartClient implements DisclosureSource {
     private static final int PAGE_SIZE = 100; // DART 최대값
 
     private final RestClient restClient = RestClient.builder()
+            .requestFactory(HttpTimeouts.factory())
             .baseUrl("https://opendart.fss.or.kr/api")
             .build();
     private final String apiKey;

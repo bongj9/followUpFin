@@ -1,5 +1,6 @@
 package com.bongj9.briefing.adapter.news;
 
+import com.bongj9.briefing.adapter.HttpTimeouts;
 import com.bongj9.briefing.application.port.MarketNewsSource;
 import com.bongj9.briefing.application.port.NewsSource;
 import com.bongj9.briefing.domain.FollowedStock;
@@ -29,6 +30,7 @@ public class GoogleNewsClient implements NewsSource, MarketNewsSource {
             "유가", "환율", "금리", "연준 OR FOMC", "관세", "코스피 OR 코스닥", "국채 금리", "뉴욕증시");
 
     private final RestClient restClient = RestClient.builder()
+            .requestFactory(HttpTimeouts.factory())
             .baseUrl("https://news.google.com/rss")
             .build();
 
