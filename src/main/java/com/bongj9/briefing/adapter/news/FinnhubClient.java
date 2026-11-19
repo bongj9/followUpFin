@@ -1,5 +1,6 @@
 package com.bongj9.briefing.adapter.news;
 
+import com.bongj9.briefing.adapter.HttpTimeouts;
 import com.bongj9.briefing.application.port.CompanyProfiles;
 import com.bongj9.briefing.application.port.NewsSource;
 import com.bongj9.briefing.domain.CompanyProfile;
@@ -22,6 +23,7 @@ public class FinnhubClient implements NewsSource, CompanyProfiles {
     private static final int LOOKBACK_DAYS = 3;
 
     private final RestClient restClient = RestClient.builder()
+            .requestFactory(HttpTimeouts.factory())
             .baseUrl("https://finnhub.io/api/v1")
             .build();
     private final String apiKey;
