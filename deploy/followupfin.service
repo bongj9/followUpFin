@@ -1,0 +1,21 @@
+# 회사 서버(리눅스)에서 상시 실행: 부팅하면 켜지고, 죽으면 다시 켠다. 설치 순서는 README '회사 서버에 올리기'
+[Unit]
+Description=followUpFin
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+User=followupfin
+# secret.yml(키·DB 비밀번호)을 ./secret.yml로 읽는다. 이 폴더와 파일은 followupfin 계정만 읽게 (chmod 600)
+WorkingDirectory=/opt/followupfin
+ExecStart=/usr/bin/java -Dfile.encoding=UTF-8 -jar /opt/followupfin/followUpFin.jar
+Restart=always
+RestartSec=30
+# 앱이 쓸 일 없는 권한을 막는다 (털려도 시스템 파일을 못 고치게)
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/followupfin
+
+[Install]
+WantedBy=multi-user.target
