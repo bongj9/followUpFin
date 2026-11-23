@@ -1,5 +1,6 @@
 package com.bongj9.briefing.adapter.deepl;
 
+import com.bongj9.briefing.adapter.HttpTimeouts;
 import com.bongj9.briefing.application.port.Translator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -18,6 +19,7 @@ public class DeeplClient implements Translator {
     public DeeplClient(@Value("${deepl.api-key:}") String apiKey) {
         this.apiKey = apiKey;
         this.restClient = RestClient.builder()
+                .requestFactory(HttpTimeouts.factory())
                 .baseUrl(apiKey.endsWith(":fx") ? "https://api-free.deepl.com/v2" : "https://api.deepl.com/v2")
                 .defaultHeader("Authorization", "DeepL-Auth-Key " + apiKey)
                 .build();
